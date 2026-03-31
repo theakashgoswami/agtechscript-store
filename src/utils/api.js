@@ -199,3 +199,158 @@ export async function checkPincode(pincode) {
   const res = await fetch(`${WORKER_URL}/api/pincode/${pincode}`);
   return res.json();
 }
+// In worker.js - handleOrders function
+export async function handleOrders(sub, request, env, cors) {
+  const method = request.method;
+
+  // POST /api/orders - Allow guest checkout
+  if (method === "POST" && (sub === "" || sub === "/")) {
+    return createOrder(request, env, cors);  // No auth required for COD
+  }
+
+  // GET /api/orders/my-orders - Auth required
+  if (method === "GET" && sub === "/my-orders") {
+    return getUserOrders(request, env, cors);
+  }
+
+  const idMatch = sub.match(/^\/(.+)$/);
+  if (method === "GET" && idMatch) {
+    return getOrderById(idMatch[1], request, env, cors);
+  }
+
+  return jsonResponse({ error: "Not found" }, 404, cors);
+}
+
+/**
+ * Creates a new order.
+ * @param {Request} request - The incoming request object.
+ * @param {Object} env - Environment bindings.
+ * @param {Object} cors - CORS headers.
+ * @returns {Promise<Response>} JSON response with the following structure:
+ * {
+ *   success: boolean,
+ *   order: {
+ *     orderId: string,
+ *     status: string,
+ *     totalAmount: number,
+ *     createdAt: string (ISO date)
+ *   }
+ * }
+ */
+ // Update createOrder function - Make user optional
+async function createOrder(request, env, cors) {
+  const body = await request.json();
+  const match = cookieHeader.match(/session_id=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+// Update createOrder function - Make user optional
+async function createOrder(request, env, cors) {
+  const body = await request.json();
+  
+  // Try to get user from cookies, but don't require it
+  let userId = null;
+  try {
+    const cookies = request.headers.get("Cookie");
+    if (cookies) {
+      const authRes = await fetch("https://api.agtechscript.in/api/auth/status", {
+        headers: { "Cookie": cookies }
+      });
+      const authData = await authRes.json();
+      if (authData.authenticated) {
+        userId = authData.user_id;
+      }
+    }
+  } catch (err) {
+    console.error("Auth check error:", err);
+  }
+
+  const sessionId = getSessionIdFromRequest(request);
+  
+  const {
+    items,
+    shippingAddress,
+    subtotal,
+    discountAmount,
+    totalAmount,
+    couponCode,
+    paymentMethod = 'cod'
+  } = body;
+    totalAmount,
+    couponCode,
+    paymentMethod = 'cod'
+  } = body;
+
+  const orderId = generateOrderId();
+
+  // Insert order (userId can be null for guest)
+  const orderResult = await env.DB.prepare(`
+    INSERT INTO orders (
+      order_id, user_id, session_id, status, payment_method, payment_status,
+      subtotal, discount_amount, shipping_charges, tax_amount, total_amount,
+      coupon_code, shipping_name, shipping_phone, shipping_email,
+      shipping_address, shipping_city, shipping_state, shipping_pincode, shipping_landmark
+    ) VALUES (?, ?, ?, 'confirmed', ?, 'pending', ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    orderId, userId, sessionId, paymentMethod,
+    subtotal, discountAmount || 0, totalAmount, couponCode || null,
+    shippingAddress.name, shippingAddress.phone, shippingAddress.email || null,
+    shippingAddress.address, shippingAddress.city || null, shippingAddress.state || null,
+    shippingAddress.pincode || null, shippingAddress.landmark || null
+  ).run();
+
+  if (!orderResult.meta || typeof orderResult.meta.last_row_id === "undefined") {
+    throw new Error("Failed to create order: missing order ID from database result.");
+  }
+  const orderDbId = orderResult.meta.last_row_id;
+    await env.DB.prepare(`
+      INSERT INTO order_items (
+        order_id, product_id, product_name, product_image,
+        quantity, price, discount_percentage, total
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      orderDbId, item.product.id, item.product.title,
+      item.product.thumbnail, item.quantity,
+      item.product.price, item.product.discountPercentage || 0,
+      item.total
+    ).run();
+
+    // Check stock before reducing
+    const stockRow = await env.DB.prepare(
+      "SELECT stock FROM products WHERE product_id = ?"
+    ).bind(item.product.id).first();
+
+    if (!stockRow || stockRow.stock < item.quantity) {
+      throw new Error(`Insufficient stock for product ${item.product.id}`);
+    }
+
+    // Reduce stock
+    await env.DB.prepare(`
+      UPDATE products SET stock = stock - ? WHERE product_id = ?
+    `).bind(item.quantity, item.product.id).run();
+    await env.DB.prepare(`
+      UPDATE products SET stock = stock - ? WHERE product_id = ?
+    `).bind(item.quantity, item.product.id).run();
+  }
+
+  // Clear cart if user is logged in
+  if (userId) {
+    const cart = await env.DB.prepare(
+      "SELECT id FROM carts WHERE user_id = ? AND status = 'active'"
+    ).bind(userId).first();
+    if (cart) {
+      await env.DB.prepare("DELETE FROM cart_items WHERE cart_id = ?").bind(cart.id).run();
+      await env.DB.prepare("UPDATE carts SET status = 'checked_out' WHERE id = ?").bind(cart.id).run();
+    }
+  }
+
+  return jsonResponse({
+    success: true,
+    order: {
+      orderId,
+      status: 'confirmed',
+      totalAmount,
+      createdAt: new Date().toISOString()
+    }
+  }, 201, cors);
+}
