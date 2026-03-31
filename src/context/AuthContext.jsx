@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 
 const AuthContext = createContext(null);
 const API = "https://api.agtechscript.in";
@@ -7,18 +7,38 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authError, setAuthError] = useState(null);
+  const abortControllerRef = useRef(null);
 
-  // ── Check auth via cookies only (NO LOCAL STORAGE) ──────────
+  // ── Cookie check WITHOUT cache-control header ──────────────────
   const checkAuthViaCookies = useCallback(async () => {
+    // Cancel previous request if any
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    abortControllerRef.current = new AbortController();
+    const { signal } = abortControllerRef.current;
+
     setLoading(true);
+    setAuthError(null);
+    
     try {
+      // 🔥 FIX: Remove "Cache-Control" header - only keep necessary ones
       const res = await fetch(`${API}/api/auth/status`, {
+        method: "GET",
         credentials: "include",
         headers: { 
           "X-Client-Host": window.location.hostname,
-          "Cache-Control": "no-cache, no-store"
+          // "Cache-Control" removed - this was causing CORS error
+          // "Pragma" removed - not needed
         },
+        signal,
       });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
       
       const data = await res.json();
 
@@ -33,6 +53,11 @@ export function AuthProvider({ children }) {
         };
         setUser(authUser);
         setIsAuthenticated(true);
+        setAuthError(null);
+        
+        // Dispatch event for other components
+        window.dispatchEvent(new CustomEvent("auth-change", { detail: { user: authUser } }));
+        
         return authUser;
       } else {
         setUser(null);
@@ -40,18 +65,40 @@ export function AuthProvider({ children }) {
         return null;
       }
     } catch (err) {
+      // Ignore abort errors
+      if (err.name === 'AbortError') {
+        console.log('Auth check aborted');
+        return null;
+      }
+      
       console.error("Auth check error:", err);
+      setAuthError(err.message);
       setUser(null);
       setIsAuthenticated(false);
       return null;
     } finally {
       setLoading(false);
+      abortControllerRef.current = null;
     }
   }, []);
 
   // ── Run on mount ────────────────────────────────────────────
   useEffect(() => {
-    checkAuthViaCookies();
+    let retryCount = 0;
+    const maxRetries = 2;
+    const retryDelay = 1000;
+    
+    const attemptAuthCheck = async () => {
+      const result = await checkAuthViaCookies();
+      
+      // If failed and not aborted, retry once
+      if (!result && retryCount < maxRetries && !abortControllerRef.current) {
+        retryCount++;
+        setTimeout(attemptAuthCheck, retryDelay);
+      }
+    };
+    
+    attemptAuthCheck();
     
     // Listen for visibility change (when returning from main site)
     const handleVisibilityChange = () => {
@@ -71,25 +118,26 @@ export function AuthProvider({ children }) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("auth-check", handleAuthEvent);
+      
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, [checkAuthViaCookies]);
 
-  // ── Require Auth (redirect to main site) ────────────────────
+  // ── Require Auth ────────────────────────────────────────────
   const requireAuth = useCallback(() => {
-    if (!isAuthenticated) {
-      // Store return URL
+    if (!isAuthenticated && !loading) {
       sessionStorage.setItem("returnAfterLogin", window.location.href);
-      // Redirect to main site login
       window.location.href = "https://agtechscript.in#login";
       return false;
     }
     return true;
-  }, [isAuthenticated]);
+  }, [isAuthenticated, loading]);
 
-  // ── Logout - Clear cookies and redirect ─────────────────────
+  // ── Logout ──────────────────────────────────────────────────
   const logout = useCallback(async () => {
     try {
-      // Call logout endpoint to clear cookies
       await fetch(`${API}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
@@ -99,18 +147,12 @@ export function AuthProvider({ children }) {
       console.error("Logout error:", err);
     }
     
-    // Clear state
     setUser(null);
     setIsAuthenticated(false);
-    
-    // Dispatch event for other components
     window.dispatchEvent(new CustomEvent("auth-change", { detail: { loggedOut: true } }));
-    
-    // Optional: redirect to home
-    // window.location.href = "/";
   }, []);
 
-  // ── Force refresh auth (useful after returning from login) ──
+  // ── Refresh Auth ────────────────────────────────────────────
   const refreshAuth = useCallback(() => {
     return checkAuthViaCookies();
   }, [checkAuthViaCookies]);
@@ -119,6 +161,7 @@ export function AuthProvider({ children }) {
     user,
     loading,
     isAuthenticated,
+    authError,
     checkAuthViaCookies,
     requireAuth,
     logout,
