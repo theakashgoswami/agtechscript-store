@@ -235,26 +235,27 @@ async function createOrderAPI(paymentMethod, paymentId = null) {
     total: discountedPrice(product.price, product.discountPercentage) * quantity,
   }));
 
-  const orderPayload = {
-    items: orderItems,
-    shippingAddress: {
-      name: form.name,
-      phone: form.phone,
-      email: form.email,
-      address: form.address,
-      city: form.city,
-      state: form.state,
-      pincode: form.pincode,
-      landmark: form.landmark,
-    },
-    subtotal,
-    discountAmount: finalDiscount,
-    totalAmount: finalTotal,
-    couponCode: couponApplied?.code || null,
-    paymentMethod,
-    paymentId,
-    // Don't send userId - backend will detect from cookies
-  };
+  // CheckoutPage.jsx - handlePlaceOrder
+
+const orderPayload = {
+  items: orderItems,
+  shippingAddress: {
+    name: form.name,         
+    phone: form.phone,
+    email: form.email,
+    address: form.address,
+    city: form.city,
+    state: form.state,
+    pincode: form.pincode,
+    landmark: form.landmark,
+  },
+  subtotal,
+  discountAmount: finalDiscount,
+  totalAmount: finalTotal,
+  couponCode: couponApplied?.code || null,
+  paymentMethod: selectedPayment,
+  // Don't send userId - backend will get from cookie
+};
 
   console.log("Sending order:", orderPayload); // Debug log
 
