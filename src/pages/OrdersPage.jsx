@@ -6,17 +6,27 @@ import { formatPrice, formatDate } from "../utils/format";
 import { OrderSkeleton } from "../components/Skeleton";
 
 export default function OrdersPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState([]);
   const [expanded, setExpanded] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      // Logged in user - fetch from API
-      getUserOrders()
-        .then((data) => {
+    // Wait for auth to load
+    if (authLoading) return;
+
+    const fetchOrders = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        if (isAuthenticated) {
+          // Logged in user - fetch from API
+          console.log("Fetching orders for user:", user?.user_id);
+          const data = await getUserOrders();
+          console.log("Orders API response:", data);
+          
           if (data.orders) {
             setOrders(data.orders);
           } else if (Array.isArray(data)) {
@@ -24,22 +34,24 @@ export default function OrdersPage() {
           } else {
             setOrders([]);
           }
-          setError(null);
-        })
-        .catch((err) => {
-          console.error("Failed to fetch orders:", err);
-          setError("Unable to load your orders. Please try again later.");
-        })
-        .finally(() => setLoading(false));
-    } else {
-      // Guest user - show localStorage orders (fallback)
-      const saved = JSON.parse(localStorage.getItem("shopzilla_orders") || "[]");
-      setOrders(saved);
-      setLoading(false);
-    }
-  }, [isAuthenticated]);
+        } else {
+          // Guest user - show localStorage orders (fallback)
+          const saved = JSON.parse(localStorage.getItem("shopzilla_orders") || "[]");
+          setOrders(saved);
+        }
+      } catch (err) {
+        console.error("Failed to fetch orders:", err);
+        setError("Unable to load your orders. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  if (loading) {
+    fetchOrders();
+  }, [isAuthenticated, user, authLoading]);
+
+  // Show loading skeleton while auth is loading
+  if (authLoading || loading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8 pb-12">
         <h1 className="font-display font-bold text-2xl text-gray-900 mb-6">My Orders</h1>
@@ -74,12 +86,24 @@ export default function OrdersPage() {
             ? "Your placed orders will appear here" 
             : "Login to view your orders"}
         </p>
-        <Link
-          to="/"
-          className="px-6 py-2.5 bg-primary-500 text-white rounded-xl font-semibold text-sm hover:bg-primary-600 transition-colors"
-        >
-          Start Shopping
-        </Link>
+        {isAuthenticated ? (
+          <Link
+            to="/"
+            className="px-6 py-2.5 bg-primary-500 text-white rounded-xl font-semibold text-sm hover:bg-primary-600 transition-colors"
+          >
+            Start Shopping
+          </Link>
+        ) : (
+          <button
+            onClick={() => {
+              localStorage.setItem("returnAfterLogin", window.location.href);
+              window.location.href = "https://agtechscript.in#login";
+            }}
+            className="px-6 py-2.5 bg-primary-500 text-white rounded-xl font-semibold text-sm hover:bg-primary-600 transition-colors"
+          >
+            Login to View Orders
+          </button>
+        )}
       </div>
     );
   }
@@ -120,6 +144,7 @@ export default function OrdersPage() {
                     (order.status === 'delivered' || order.order_status === 'delivered') ? 'bg-emerald-50 text-emerald-600' :
                     (order.status === 'confirmed' || order.order_status === 'confirmed') ? 'bg-blue-50 text-blue-600' :
                     (order.status === 'processing' || order.order_status === 'processing') ? 'bg-amber-50 text-amber-600' :
+                    (order.status === 'cancelled' || order.order_status === 'cancelled') ? 'bg-red-50 text-red-600' :
                     'bg-gray-50 text-gray-600'
                   }`}>
                     {order.status || order.order_status || 'Confirmed'}
