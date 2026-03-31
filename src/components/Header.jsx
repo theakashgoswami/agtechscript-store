@@ -5,7 +5,6 @@ import { useAuth } from "../context/AuthContext";
 import { debounce } from "../utils/format";
 import CartDrawer from "./CartDrawer";
 
-// Category list
 const CATEGORIES_LABELS = {
   smartphones:      "📱 Smartphones",
   skincare:         "✨ Skincare",
@@ -24,12 +23,11 @@ const CATEGORIES_LABELS = {
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
-  const headerRef = useRef(null);
   const userMenuRef = useRef(null);
   const categoryRef = useRef(null);
 
   const { itemCount } = useCart();
-  const { user, isAuthenticated, logout, requireAuth, checkAuthViaCookies } = useAuth();
+  const { user, isAuthenticated, logout, requireAuth, refreshAuth } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
@@ -38,17 +36,15 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
 
-  // ── On mount: return-after-login check ──────────────────────
+  // ── Check auth when returning from main site ─────────────────
   useEffect(() => {
-    const returnUrl = localStorage.getItem("returnAfterLogin");
-    if (returnUrl && !isAuthenticated) {
-      checkAuthViaCookies?.().then((authUser) => {
-        if (authUser) localStorage.removeItem("returnAfterLogin");
-      });
-    } else if (returnUrl && isAuthenticated) {
-      localStorage.removeItem("returnAfterLogin");
+    // Check if we came back from login
+    const returnUrl = sessionStorage.getItem("returnAfterLogin");
+    if (returnUrl) {
+      sessionStorage.removeItem("returnAfterLogin");
+      refreshAuth();
     }
-  }, [isAuthenticated, checkAuthViaCookies]);
+  }, [refreshAuth]);
 
   // ── Sync search bar with URL ─────────────────────────────────
   useEffect(() => {
@@ -98,26 +94,23 @@ export default function Header() {
     if (isAuthenticated) {
       setUserMenuOpen((v) => !v);
     } else {
-      localStorage.setItem("returnAfterLogin", window.location.href);
+      // Store return URL in sessionStorage (clears after session)
+      sessionStorage.setItem("returnAfterLogin", window.location.href);
       window.location.href = "https://agtechscript.in#login";
     }
   }
 
   function handleOrders() {
-    if (requireAuth && requireAuth()) {
-      navigate("/orders");
-    } else if (!isAuthenticated) {
-      localStorage.setItem("returnAfterLogin", window.location.href);
-      window.location.href = "https://agtechscript.in#login";
-      return;
-    } else {
+    if (requireAuth()) {
       navigate("/orders");
     }
     setUserMenuOpen(false);
   }
 
   function handleProfile() {
-    window.location.href = "https://account.agtechscript.in";
+    if (requireAuth()) {
+      window.location.href = "https://account.agtechscript.in";
+    }
     setUserMenuOpen(false);
   }
 
@@ -128,17 +121,13 @@ export default function Header() {
 
   return (
     <>
-      <header 
-        ref={headerRef} 
-        className={`ag-header ${isScrolled ? "ag-header-hidden" : ""}`}
-      >
-        {/* Shine Effect - Fixed positioning */}
+      <header className={`ag-header ${isScrolled ? "ag-header-hidden" : ""}`}>
         <div className="ag-shine-effect"></div>
         
         <div className="ag-header-inner">
           {/* Logo Section */}
           <div className="ag-logo-section">
-            <Link to="/" className="ag-logo-link">
+            <div  className="ag-logo-link">
               <img
                 src="https://cdn.agtechscript.in/AGTechScript.webp"
                 alt="AG TechScript"
@@ -148,10 +137,10 @@ export default function Header() {
                   e.target.src = "https://placehold.co/60x60/0047ff/white?text=AG";
                 }}
               />
-               <a className="ag-logo-text" href="https://agtechscript.in" target="_blank" rel="noopener noreferrer">
+             </div>
+              <a className="ag-logo-text" href="https://agtechscript.in" target="_blank" rel="noopener noreferrer">
                 AG TechScript
               </a>
-            </Link>
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -164,7 +153,6 @@ export default function Header() {
 
           {/* Navigation */}
           <nav className={`ag-nav ${mobileMenuOpen ? "ag-nav-open" : ""}`}>
-            {/* Home */}
             <NavLink to="/" onClick={() => setMobileMenuOpen(false)}>
               <HomeIcon /> Home
             </NavLink>
@@ -254,7 +242,7 @@ export default function Header() {
   );
 }
 
-/* ── Sub-components ──────────────────────────────────────────── */
+// Sub-components
 function NavLink({ to, children, onClick }) {
   return (
     <Link to={to} onClick={onClick} className="ag-nav-link">
@@ -271,63 +259,12 @@ function DropBtn({ onClick, icon, label, danger }) {
   );
 }
 
-/* ── Icons ── */
-const HomeIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2h-5v-8H7v8H5a2 2 0 0 1-2-2z" />
-  </svg>
-);
-
-const GridIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="3" y="3" width="7" height="7" />
-    <rect x="14" y="3" width="7" height="7" />
-    <rect x="14" y="14" width="7" height="7" />
-    <rect x="3" y="14" width="7" height="7" />
-  </svg>
-);
-
-const SearchIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-    <circle cx="11" cy="11" r="8" />
-    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-);
-
-const CartIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <path d="M16 10a4 4 0 0 1-8 0" />
-  </svg>
-);
-
-const UserIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
-
-const OrderIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <path d="M16 10a4 4 0 0 1-8 0" />
-  </svg>
-);
-
-const ProfileIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="8" r="4" />
-    <path d="M5 20v-2a7 7 0 0 1 14 0v2" />
-  </svg>
-);
-
-const LogoutIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <polyline points="16 17 21 12 16 7" />
-    <line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-);
+// Icons
+const HomeIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2h-5v-8H7v8H5a2 2 0 0 1-2-2z" /></svg>);
+const GridIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>);
+const SearchIcon = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>);
+const CartIcon = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>);
+const UserIcon = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>);
+const OrderIcon = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>);
+const ProfileIcon = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M5 20v-2a7 7 0 0 1 14 0v2"/></svg>);
+const LogoutIcon = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>);
