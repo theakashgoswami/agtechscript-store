@@ -1,80 +1,74 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 
 const AuthContext = createContext(null);
-
 const API = "https://api.agtechscript.in";
 
 export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // On mount: check existing session via cookie
-  useEffect(() => {
-    checkSession();
-  }, []);
-
-  async function checkSession() {
+  // ── Cookie check on every page load ──────────────────────────
+  const checkAuthViaCookies = useCallback(async () => {
     try {
       const res = await fetch(`${API}/api/auth/status`, {
         credentials: "include",
-        headers: {
-          "X-Client-Host": window.location.hostname,
-        },
+        headers: { "X-Client-Host": window.location.hostname },
       });
       const data = await res.json();
 
       if (data.authenticated) {
-        setUser({
+        const authUser = {
           user_id:       data.user_id,
           name:          data.name || data.user_id,
+          email:         data.email || "",
           role:          data.role,
-          profile_image: data.profile_image,
-          email:         data.email,
-        });
+          profile_image: data.profile_image || null,
+        };
+        setUser(authUser);
+        return authUser;
       } else {
         setUser(null);
+        return null;
       }
     } catch {
       setUser(null);
+      return null;
     } finally {
       setLoading(false);
     }
-  }
-
-  const login = useCallback(async (identity, password, role = "user") => {
-    const res = await fetch(`${API}/api/auth/login`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identity, password, role }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Login failed");
-
-    const u = {
-      user_id:       data.user.user_id,
-      name:          data.user.name || data.user.user_id,
-      role:          data.user.role,
-      profile_image: data.user.profile_image,
-    };
-    setUser(u);
-    return u;
   }, []);
 
-  const logout = useCallback(async () => {
-    try {
-      // Clear cookie by redirecting to auth domain logout
-      await fetch(`${API}/api/auth/logout`, { credentials: "include" }).catch(() => {});
-    } catch {}
+  // Run on mount
+  useEffect(() => {
+    checkAuthViaCookies();
+  }, [checkAuthViaCookies]);
+
+  // requireAuth — redirect to login if not authenticated
+  const requireAuth = useCallback(() => {
+    if (!user) {
+      localStorage.setItem("returnAfterLogin", window.location.href);
+      window.location.href = "https://agtechscript.in#login";
+      return false;
+    }
+    return true;
+  }, [user]);
+
+  const logout = useCallback(() => {
     setUser(null);
-    // Redirect to main site login
-    window.location.href = "https://account.agtechscript.in";
+    // Clear cookie by hitting logout endpoint
+    fetch(`${API}/api/auth/logout`, { credentials: "include" }).catch(() => {});
+    window.location.href = "https://agtechscript.in";
   }, []);
-
-  const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated, checkSession }}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      isAuthenticated: !!user,
+      checkAuthViaCookies,
+      requireAuth,
+      logout,
+    }}>
       {children}
     </AuthContext.Provider>
   );
