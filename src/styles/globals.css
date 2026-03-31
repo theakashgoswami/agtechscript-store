@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== AG TechScript Design System ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { max-width: 100%; overflow-x: hidden; }
+
+body {
+  font-family: system-ui, 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #f5f7fa, #e4e8f0);
+  color: #333;
+  line-height: 1.6;
+  min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
+  -webkit-font-smoothing: antialiased;
+}
+body.dark-mode {
+  background: linear-gradient(135deg, #0a0f2c, #1a1a2e);
+  color: #fff;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f0f0f0; border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: #0047ff; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #00e6ff; }
+.dark-mode ::-webkit-scrollbar-track { background: #1a1a2e; }
+
+/* Skeleton */
+.skeleton {
+  background: linear-gradient(90deg,#e8eaed 25%,#f0f2f5 50%,#e8eaed 75%);
+  background-size: 700px 100%;
+  animation: shimmer 1.5s infinite linear;
+  border-radius: 4px;
+}
+.dark-mode .skeleton {
+  background: linear-gradient(90deg,#1a1f3a 25%,#222840 50%,#1a1f3a 75%);
+  background-size: 700px 100%;
+}
+
+/* Glass Card */
+.glass-card {
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0,71,255,0.12);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+.dark-mode .glass-card {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1);
+}
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top:0;left:0;right:0;
+  height: 3px;
+  background: linear-gradient(90deg,#0047ff,#00e6ff);
+}
+.glass-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(0,71,255,0.35);
+  box-shadow: 0 16px 40px rgba(0,71,255,0.15);
+}
+
+/* Product Card */
+.product-card {
+  transition: box-shadow 0.25s,transform 0.25s;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid rgba(0,71,255,0.08);
+}
+.dark-mode .product-card {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.08);
+}
+.product-card:hover {
+  box-shadow: 0 8px 24px rgba(0,71,255,0.18),0 16px 40px rgba(0,71,255,0.10);
+  transform: translateY(-3px);
+}
+
+/* Price */
+.price-original { text-decoration: line-through; color: #9CA3AF; }
+
+/* Cart */
+.cart-overlay { animation: fadeIn 0.2s ease-out; }
+.cart-drawer  { animation: slideIn 0.3s ease-out; }
+
+/* Lazy img */
+img.lazy { opacity:0; transition: opacity 0.3s; }
+img.lazy.loaded { opacity:1; }
+
+/* Range */
+input[type="range"] { -webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:#e5e7eb; outline:none; }
+.dark-mode input[type="range"] { background:#2d3a5a; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:#0047ff; cursor:pointer; border:2px solid white; box-shadow:0 1px 4px rgba(0,71,255,0.5); }
+
+/* Toast */
+.toast-container { position:fixed; top:80px; right:16px; z-index:9999; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+.toast-container > * { pointer-events:all; }
+
+/* Glow */
+.glow-text-blue { text-shadow:0 0 15px rgba(0,71,255,0.6); }
+.glow-text-cyan { text-shadow:0 0 15px rgba(0,230,255,0.6); }
+
+/* Glass utility */
+@layer utilities {
+  .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .glass { background:rgba(255,255,255,0.08); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.15); }
+}
