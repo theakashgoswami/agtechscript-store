@@ -188,22 +188,6 @@ export async function getOrderById(id) {
   });
   return res.json();
 }
-// Add these functions to your utils/api.js
-
-// Create order
-export async function createOrder(orderData) {
-  const res = await fetch(`${WORKER_URL}/api/orders`, {
-    method: "POST",
-    credentials: "include",
-    headers: { 
-      "Content-Type": "application/json",
-      "X-Client-Host": window.location.hostname
-    },
-    body: JSON.stringify(orderData)
-  });
-  return res.json();
-}
-
 // Validate coupon
 export async function validateCoupon(code, subtotal) {
   const res = await fetch(`${WORKER_URL}/api/coupons/validate?code=${encodeURIComponent(code)}&subtotal=${subtotal}`);
