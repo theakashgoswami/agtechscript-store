@@ -9,18 +9,16 @@ import { CATEGORY_LABELS } from "../utils/constants.js";
 // Condensed category list for dropdown
 const CATEGORIES_LABELS = {
   smartphones:      "📱 Smartphones",
-  laptops:          "💻 Laptops",
   skincare:         "✨ Skincare",
   fragrances:       "🌸 Fragrances",
   groceries:        "🛒 Groceries",
-  furniture:        "🛋️ Furniture",
+  furniture:        "🛋️ Furniture", 
   "home-decoration":"🏠 Home Decor",
   "mens-shirts":    "👔 Men's Shirts",
   "mens-shoes":     "👟 Men's Shoes",
   "womens-dresses": "👗 Women's Dresses",
   "womens-shoes":   "👠 Women's Shoes",
   smartphones:      "📱 Smartphones",
-  laptops:          "💻 Laptops",
   sunglasses:       "🕶️ Sunglasses",
   automotive:       "🚗 Automotive",
 };
