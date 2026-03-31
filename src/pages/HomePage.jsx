@@ -46,11 +46,11 @@ const FEATURED_CATEGORIES = [
 ];
 
 export default function HomePage() {
-  const [products,     setProducts]     = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [page,         setPage]         = useState(0);
-  const [hasMore,      setHasMore]      = useState(true);
-  const [bannerIndex,  setBannerIndex]  = useState(0);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [bannerIndex, setBannerIndex] = useState(0);
   const LIMIT = 20;
 
   useEffect(() => {
@@ -62,13 +62,24 @@ export default function HomePage() {
   async function loadProducts(pageNum, replace = false) {
     setLoading(true);
     try {
-      const data = await getProducts({ limit: LIMIT, skip: pageNum * LIMIT });
+      // 🔥 FIX: getProducts now handles both normal and category queries
+      const data = await getProducts({ 
+        limit: LIMIT, 
+        skip: pageNum * LIMIT 
+      });
+      
+      // Handle both response formats
       const items = data.products || data;
-      setProducts(prev => replace ? items : [...prev, ...items]);
-      setHasMore(items.length === LIMIT);
+      const itemsArray = Array.isArray(items) ? items : [];
+      
+      setProducts(prev => replace ? itemsArray : [...prev, ...itemsArray]);
+      setHasMore(itemsArray.length === LIMIT);
       setPage(pageNum);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    } catch (e) { 
+      console.error("Error loading products:", e); 
+    } finally { 
+      setLoading(false); 
+    }
   }
 
   const banner = HERO_BANNERS[bannerIndex];
@@ -111,7 +122,10 @@ export default function HomePage() {
             {HERO_BANNERS.map((_, i) => (
               <button key={i} onClick={() => setBannerIndex(i)}
                 className="h-1.5 rounded-full transition-all"
-                style={{ width: i === bannerIndex ? "16px" : "6px", background: i === bannerIndex ? "#fff" : "rgba(255,255,255,0.4)" }} />
+                style={{ 
+                  width: i === bannerIndex ? "16px" : "6px", 
+                  background: i === bannerIndex ? "#fff" : "rgba(255,255,255,0.4)" 
+                }} />
             ))}
           </div>
         </div>
@@ -174,11 +188,17 @@ export default function HomePage() {
               {products.map(p => <ProductCard key={p.id} product={p} />)}
             </div>
 
-            {hasMore && (
+            {hasMore && products.length > 0 && (
               <div className="flex justify-center mt-8">
-                <button onClick={() => loadProducts(page + 1)} disabled={loading}
-                  className="px-8 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
-                  style={{ background:"rgba(0,71,255,0.08)", border:"1px solid rgba(0,71,255,0.2)", color:"#0047ff" }}>
+                <button 
+                  onClick={() => loadProducts(page + 1)} 
+                  disabled={loading}
+                  className="px-8 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 hover:scale-105"
+                  style={{ 
+                    background: "rgba(0,71,255,0.08)", 
+                    border: "1px solid rgba(0,71,255,0.2)", 
+                    color: "#0047ff" 
+                  }}>
                   {loading ? "Loading…" : "Load More Products"}
                 </button>
               </div>
