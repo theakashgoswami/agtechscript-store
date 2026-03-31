@@ -5,10 +5,9 @@ import { useAuth } from "../context/AuthContext";
 import { debounce } from "../utils/format";
 import CartDrawer from "./CartDrawer";
 
-// ─── FIXED: Removed duplicate keys ─────────────────────────────
+// Category list
 const CATEGORIES_LABELS = {
   smartphones:      "📱 Smartphones",
-  laptops:          "💻 Laptops",
   skincare:         "✨ Skincare",
   fragrances:       "🌸 Fragrances",
   groceries:        "🛒 Groceries",
@@ -133,10 +132,10 @@ export default function Header() {
         ref={headerRef} 
         className={`ag-header ${isScrolled ? "ag-header-hidden" : ""}`}
       >
+        {/* Shine Effect - Fixed positioning */}
+        <div className="ag-shine-effect"></div>
+        
         <div className="ag-header-inner">
-          {/* Shine Effect */}
-          <div className="ag-shine-effect"></div>
-
           {/* Logo Section */}
           <div className="ag-logo-section">
             <Link to="/" className="ag-logo-link">
@@ -149,7 +148,7 @@ export default function Header() {
                   e.target.src = "https://placehold.co/60x60/0047ff/white?text=AG";
                 }}
               />
-              <a className="ag-logo-text" href="https://agtechscript.in" target="_blank" rel="noopener noreferrer">
+               <a className="ag-logo-text" href="https://agtechscript.in" target="_blank" rel="noopener noreferrer">
                 AG TechScript
               </a>
             </Link>
