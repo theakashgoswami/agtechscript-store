@@ -221,44 +221,62 @@ export default function CheckoutPage() {
     : total;
   const finalDiscount = discount + (couponApplied?.discountAmount || 0);
 
-  // Create order via API
-  async function createOrderAPI(paymentMethod, paymentId = null) {
-    const orderItems = cart.map(({ product, quantity }) => ({
-      product: {
-        id: product.product_id || product.id,
-        title: product.title,
-        thumbnail: product.thumbnail,
-        price: product.price,
-        discountPercentage: product.discountPercentage || 0,
-      },
-      quantity,
-      total: discountedPrice(product.price, product.discountPercentage) * quantity,
-    }));
+// In CheckoutPage.jsx - Update createOrderAPI function
+async function createOrderAPI(paymentMethod, paymentId = null) {
+  const orderItems = cart.map(({ product, quantity }) => ({
+    product: {
+      id: product.product_id || product.id,
+      title: product.title,
+      thumbnail: product.thumbnail,
+      price: product.price,
+      discountPercentage: product.discountPercentage || 0,
+    },
+    quantity,
+    total: discountedPrice(product.price, product.discountPercentage) * quantity,
+  }));
 
-    const orderPayload = {
-      items: orderItems,
-      shippingAddress: {
-        name: form.name,
-        phone: form.phone,
-        email: form.email,
-        address: form.address,
-        city: form.city,
-        state: form.state,
-        pincode: form.pincode,
-        landmark: form.landmark,
-      },
-      subtotal,
-      discountAmount: finalDiscount,
-      totalAmount: finalTotal,
-      couponCode: couponApplied?.code || null,
-      paymentMethod,
-      paymentId,
-      userId,
-    };
+  const orderPayload = {
+    items: orderItems,
+    shippingAddress: {
+      name: form.name,
+      phone: form.phone,
+      email: form.email,
+      address: form.address,
+      city: form.city,
+      state: form.state,
+      pincode: form.pincode,
+      landmark: form.landmark,
+    },
+    subtotal,
+    discountAmount: finalDiscount,
+    totalAmount: finalTotal,
+    couponCode: couponApplied?.code || null,
+    paymentMethod,
+    paymentId,
+    // Don't send userId - backend will detect from cookies
+  };
 
-    const response = await createOrder(orderPayload);
-    return response;
+  console.log("Sending order:", orderPayload); // Debug log
+
+  const response = await fetch('https://store.agtechscript.in/api/orders', {
+    method: "POST",
+    credentials: "include",  // Important: sends cookies
+    headers: { 
+      "Content-Type": "application/json",
+      "X-Client-Host": window.location.hostname
+    },
+    body: JSON.stringify(orderPayload)
+  });
+
+  const data = await response.json();
+  console.log("Order response:", data); // Debug log
+  
+  if (!response.ok) {
+    throw new Error(data.error || "Order creation failed");
   }
+  
+  return data;
+}
 
   // Handle COD order
   async function handleCODOrder() {
