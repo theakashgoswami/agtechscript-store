@@ -260,12 +260,12 @@ export default function Header() {
               {/* Dropdown — only when logged in */}
               {userMenuOpen && isAuthenticated && (
                 <div style={{
-                  position:"absolute", right:0, top:"calc(100% + 8px)",
-                  minWidth:180, background:"rgba(10,15,44,0.97)",
-                  border:"1px solid rgba(0,71,255,0.35)", borderRadius:16,
-                  backdropFilter:"blur(20px)", boxShadow:"0 20px 50px rgba(0,0,0,0.5)",
-                  overflow:"hidden", animation:"fadeIn 0.2s ease-out", zIndex:10001,
-                }}>
+  position:"absolute", right:0, top:"calc(100% + 8px)",
+  minWidth:190, background:"#0d1535",
+  border:"1px solid rgba(0,71,255,0.4)", borderRadius:16,
+  boxShadow:"0 20px 50px rgba(0,0,0,0.7)",
+  overflow:"hidden", animation:"fadeIn 0.2s ease-out", zIndex:99999,
+}}>
                   {/* User info */}
                   <div style={{ padding:"14px 16px", borderBottom:"1px solid rgba(255,255,255,0.08)" }}>
                     <div style={{ fontWeight:700, color:"#fff", fontSize:14,
@@ -338,23 +338,36 @@ export default function Header() {
 
         /* Dropdown */
         .ag-dropdown-wrap { position:relative; }
-        .ag-dropdown-menu {
-          display: none;
-          position: absolute;
-          top: calc(100% + 8px);
-          left: 0;
-          min-width: 200px;
-          background: rgba(10,15,44,0.97);
-          border: 1px solid rgba(0,71,255,0.3);
-          border-radius: 14px;
-          backdrop-filter: blur(20px);
-          box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-          overflow: hidden;
-          z-index: 10001;
-          max-height: 70vh;
-          overflow-y: auto;
-        }
-        .ag-dropdown-wrap:hover .ag-dropdown-menu { display: block; animation: fadeIn 0.2s; }
+      .ag-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 220px;
+  background: #0d1535 !important;
+  border: 1px solid rgba(0,71,255,0.4);
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+  overflow: hidden;
+  z-index: 99999 !important;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.ag-dropdown-menu a {
+  color: #e0e8ff !important;
+  display: block;
+  padding: 10px 16px;
+  text-decoration: none;
+  font-size: 14px;
+  transition: background 0.2s;
+  white-space: nowrap;
+  background: transparent !important;
+}
+.ag-dropdown-menu a:hover {
+  background: rgba(0,230,255,0.15) !important;
+  color: #fff !important;
+}
+.ag-dropdown-wrap:hover .ag-dropdown-menu { display: block; animation: fadeIn 0.2s; }
 
         /* Mobile */
         @media (max-width: 768px) {
