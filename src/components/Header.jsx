@@ -38,6 +38,18 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
 
+  // Check if mobile view (for conditional rendering)
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // ── Close all menus when clicking outside ─────────────────────────
   useEffect(() => {
     function handleClickOutside(e) {
@@ -59,7 +71,7 @@ export default function Header() {
     
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [mobileMenuOpen]); // Added mobileMenuOpen dependency
+  }, [mobileMenuOpen]);
 
   // ── Close mobile menu when navigating (page change) ───────────────
   useEffect(() => {
@@ -115,15 +127,38 @@ export default function Header() {
     setCategoryOpen(false);
   };
 
+  // ── Mobile category toggle (opens only category, closes others) ───
+  const handleMobileCategoryClick = () => {
+    if (isMobile) {
+      // On mobile: close other dropdowns, toggle category
+      setUserMenuOpen(false);
+      setCategoryOpen(!categoryOpen);
+      // Keep mobile menu open
+    } else {
+      // On desktop: normal toggle
+      setCategoryOpen(!categoryOpen);
+    }
+  };
+
   // ── User actions ───────────────────────────────────────────────────
   function handleUserClick() {
     if (isAuthenticated) {
-      setUserMenuOpen((v) => !v);
+      if (isMobile) {
+        // On mobile: close category, toggle user menu
+        setCategoryOpen(false);
+        setUserMenuOpen(!userMenuOpen);
+      } else {
+        setUserMenuOpen(!userMenuOpen);
+      }
     } else {
       sessionStorage.setItem("returnAfterLogin", window.location.href);
       window.location.href = "https://agtechscript.in#login";
     }
-    setMobileMenuOpen(false);
+    if (isMobile) {
+      // Keep mobile menu open on mobile
+    } else {
+      setMobileMenuOpen(false);
+    }
   }
 
   function handleOrders() {
@@ -154,6 +189,16 @@ export default function Header() {
     closeAllMenus();
   }
 
+  // Toggle mobile menu
+  function toggleMobileMenu() {
+    setMobileMenuOpen(!mobileMenuOpen);
+    // Reset dropdowns when opening mobile menu
+    if (!mobileMenuOpen) {
+      setUserMenuOpen(false);
+      setCategoryOpen(false);
+    }
+  }
+
   return (
     <>
       <header className={`ag-header ${isScrolled ? "ag-header-hidden" : ""}`}>
@@ -171,15 +216,14 @@ export default function Header() {
                   e.target.onerror = null;
                   e.target.src = "https://placehold.co/60x60/0047ff/white?text=AG";
                 }}
-              /> 
-               </Link>
+              />
+              </Link>
               <a href="https://agtechscript.in" className="ag-logo-text" target="_blank" rel="noopener noreferrer">
                 AG TechScript
               </a>
-          
 
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={toggleMobileMenu}
               className="ag-hamburger"
               aria-label="Toggle menu"
             >
@@ -201,9 +245,9 @@ export default function Header() {
             <div className="ag-dropdown" ref={categoryRef}>
               <button 
                 className="ag-dropdown-trigger"
-                onClick={() => setCategoryOpen(!categoryOpen)}
+                onClick={handleMobileCategoryClick}
               >
-                <GridIcon /> Categories ▾
+                <GridIcon /> Categories {categoryOpen ? "▴" : "▾"}
               </button>
               <div className={`ag-dropdown-menu ${categoryOpen ? "show" : ""}`}>
                 {Object.entries(CATEGORIES_LABELS).map(([slug, label]) => (
@@ -285,7 +329,7 @@ export default function Header() {
   );
 }
 
-// Icons (separate for cleaner code)
+// Icons (same as before)
 const HomeIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2h-5v-8H7v8H5a2 2 0 0 1-2-2z" />
