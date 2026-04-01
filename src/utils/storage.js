@@ -1,7 +1,7 @@
-const CART_KEY = "shopzilla_cart";
-const AUTH_KEY = "shopzilla_auth";
-const WISHLIST_KEY = "shopzilla_wishlist";
-const RECENT_KEY = "shopzilla_recent";
+const CART_KEY = "AGTechScript_cart";
+const AUTH_KEY = "AGTechScript_auth";
+const WISHLIST_KEY = "AGTechScript_wishlist";
+const RECENT_KEY = "AGTechScript_recent";
 
 // ===== Cart Storage =====
 
