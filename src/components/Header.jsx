@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
@@ -21,6 +21,9 @@ const CATEGORIES_LABELS = {
   automotive: "🚗 Automotive",
 };
 
+// Main API endpoint for user profile
+const MAIN_API = "https://api.agtechscript.in";
+
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,8 +40,10 @@ export default function Header() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [fullUserProfile, setFullUserProfile] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
 
-  // Check if mobile view (for conditional rendering)
+  // Check if mobile view
   const [isMobile, setIsMobile] = useState(false);
   
   useEffect(() => {
@@ -50,20 +55,42 @@ export default function Header() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // 🔥 Fetch full user profile from main API when user is authenticated
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (isAuthenticated && user?.user_id) {
+        setLoadingProfile(true);
+        try {
+          const response = await fetch(`${MAIN_API}/api/user/profile?user_id=${user.user_id}`, {
+            credentials: "include",
+            headers: {
+              "X-Client-Host": window.location.hostname
+            }
+          });
+          const data = await response.json();
+          if (data.success) {
+            setFullUserProfile(data);
+          }
+        } catch (err) {
+          console.error("Failed to fetch user profile:", err);
+        } finally {
+          setLoadingProfile(false);
+        }
+      }
+    };
+    
+    fetchUserProfile();
+  }, [isAuthenticated, user?.user_id]);
+
   // ── Close all menus when clicking outside ─────────────────────────
   useEffect(() => {
     function handleClickOutside(e) {
-      // Close user dropdown if click outside
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
         setUserMenuOpen(false);
       }
-      
-      // Close category dropdown if click outside
       if (categoryRef.current && !categoryRef.current.contains(e.target)) {
         setCategoryOpen(false);
       }
-      
-      // Close mobile menu if click outside and menu is open
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target) && mobileMenuOpen) {
         setMobileMenuOpen(false);
       }
@@ -73,7 +100,7 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [mobileMenuOpen]);
 
-  // ── Close mobile menu when navigating (page change) ───────────────
+  // ── Close mobile menu when navigating ───────────────────────────────
   useEffect(() => {
     setMobileMenuOpen(false);
     setUserMenuOpen(false);
@@ -127,15 +154,24 @@ export default function Header() {
     setCategoryOpen(false);
   };
 
-  // ── Mobile category toggle (opens only category, closes others) ───
+  // ── Toggle mobile menu ─────────────────────────────────────────────
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(prev => {
+      const newState = !prev;
+      if (!newState) {
+        setUserMenuOpen(false);
+        setCategoryOpen(false);
+      }
+      return newState;
+    });
+  };
+
+  // ── Mobile category toggle ─────────────────────────────────────────
   const handleMobileCategoryClick = () => {
     if (isMobile) {
-      // On mobile: close other dropdowns, toggle category
       setUserMenuOpen(false);
       setCategoryOpen(!categoryOpen);
-      // Keep mobile menu open
     } else {
-      // On desktop: normal toggle
       setCategoryOpen(!categoryOpen);
     }
   };
@@ -144,7 +180,6 @@ export default function Header() {
   function handleUserClick() {
     if (isAuthenticated) {
       if (isMobile) {
-        // On mobile: close category, toggle user menu
         setCategoryOpen(false);
         setUserMenuOpen(!userMenuOpen);
       } else {
@@ -154,9 +189,7 @@ export default function Header() {
       sessionStorage.setItem("returnAfterLogin", window.location.href);
       window.location.href = "https://agtechscript.in#login";
     }
-    if (isMobile) {
-      // Keep mobile menu open on mobile
-    } else {
+    if (!isMobile) {
       setMobileMenuOpen(false);
     }
   }
@@ -189,18 +222,11 @@ export default function Header() {
     closeAllMenus();
   }
 
-// Toggle mobile menu - FIXED
-function toggleMobileMenu() {
-  setMobileMenuOpen(prev => {
-    const newState = !prev;
-    // Reset dropdowns ONLY when closing the menu
-    if (!newState) {
-      setUserMenuOpen(false);
-      setCategoryOpen(false);
-    }
-    return newState;
-  });
-}
+  // Get display name (prefer full profile name)
+  const displayName = fullUserProfile?.name || user?.name || user?.user_id || "User";
+  const displayEmail = fullUserProfile?.email || user?.email || "";
+  const displayPoints = fullUserProfile?.points;
+  const displayPhone = fullUserProfile?.phone;
 
   return (
     <>
@@ -210,7 +236,7 @@ function toggleMobileMenu() {
         <div className="ag-header-inner">
           {/* Logo Section */}
           <div className="ag-logo-section">
-            <Link to="/" className="ag-logo-link" onClick={handleLinkClick}>
+            <Link to="https://agtechscript.in" className="ag-logo-link" onClick={handleLinkClick} target="_blank">
               <img
                 src="https://cdn.agtechscript.in/AGTechScript.webp"
                 alt="AG TechScript"
@@ -220,10 +246,8 @@ function toggleMobileMenu() {
                   e.target.src = "https://placehold.co/60x60/0047ff/white?text=AG";
                 }}
               />
-              </Link>
-              <a href="https://agtechscript.in" className="ag-logo-text" target="_blank" rel="noopener noreferrer">
-                AG TechScript
-              </a>
+              <span className="ag-logo-text">AG TechScript</span>
+            </Link>
 
             <button
               onClick={toggleMobileMenu}
@@ -285,8 +309,10 @@ function toggleMobileMenu() {
             {/* User Menu */}
             <div className="ag-user-wrapper" ref={userMenuRef}>
               <button onClick={handleUserClick} className="ag-user-btn">
-                {isAuthenticated && user?.profile_image ? (
-                  <img src={user.profile_image} alt={user?.name} className="ag-user-avatar" />
+                {isAuthenticated && fullUserProfile?.profile_image ? (
+                  <img src={fullUserProfile.profile_image} alt={displayName} className="ag-user-avatar" />
+                ) : isAuthenticated && user?.profile_image ? (
+                  <img src={user.profile_image} alt={displayName} className="ag-user-avatar" />
                 ) : (
                   <UserIcon />
                 )}
@@ -295,8 +321,16 @@ function toggleMobileMenu() {
               {userMenuOpen && isAuthenticated && (
                 <div className="ag-user-dropdown">
                   <div className="ag-user-info">
-                    <div className="ag-user-name">{user?.name || user?.user_id || "User"}</div>
-                    <div className="ag-user-email">{user?.email || user?.user_id}</div>
+                    <div className="ag-user-name">{displayName}</div>
+                    <div className="ag-user-email">{displayEmail || displayName}</div>
+                    {displayPhone && (
+                      <div className="ag-user-phone text-xs text-gray-400 mt-1">{displayPhone}</div>
+                    )}
+                    {displayPoints !== undefined && (
+                      <div className="ag-user-points text-xs text-cyan-400 mt-1">
+                        ⭐ {displayPoints} points
+                      </div>
+                    )}
                   </div>
                   <button onClick={handleOrders} className="ag-dropdown-item">
                     <OrderIcon /> My Orders

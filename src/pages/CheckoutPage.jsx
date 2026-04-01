@@ -90,33 +90,31 @@ export default function CheckoutPage() {
   const [pincodeValid, setPincodeValid] = useState(null);
   const [pincodeChecking, setPincodeChecking] = useState(false);
 
-  // Load user details on mount
-  useEffect(() => {
-    const loadUserDetails = async () => {
-      if (isAuthenticated && user) {
-        setUserId(user.user_id);
-        setForm((prev) => ({
-          ...prev,
-          name: user.name || prev.name,
-          email: user.email || prev.email,
-          phone: user.phone || prev.phone,
-        }));
-      } else {
-        // Try to check auth again
-        const authUser = await checkAuthViaCookies();
-        if (authUser) {
-          setUserId(authUser.user_id);
-          setForm((prev) => ({
+ // In CheckoutPage.jsx - fetch user profile similarly
+useEffect(() => {
+  const fetchUserProfile = async () => {
+    if (isAuthenticated && user?.user_id) {
+      try {
+        const res = await fetch(`https://api.agtechscript.in/api/user/profile?user_id=${user.user_id}`, {
+          credentials: "include"
+        });
+        const data = await res.json();
+        if (data.success) {
+          setForm(prev => ({
             ...prev,
-            name: authUser.name || prev.name,
-            email: authUser.email || prev.email,
-            phone: authUser.phone || prev.phone,
+            name: data.name || prev.name,
+            email: data.email || prev.email,
+            phone: data.phone || prev.phone,
+            address: data.address || prev.address,
           }));
         }
+      } catch (err) {
+        console.error("Failed to fetch profile:", err);
       }
-    };
-    loadUserDetails();
-  }, [isAuthenticated, user, checkAuthViaCookies]);
+    }
+  };
+  fetchUserProfile();
+}, [isAuthenticated, user]);
 
   // Cart empty check
   if (cart.length === 0 && !placed) {
