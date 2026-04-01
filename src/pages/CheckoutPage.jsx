@@ -4,7 +4,6 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { formatPrice, discountedPrice } from "../utils/format";
-import { createOrder } from "../utils/api";
 
 // Payment methods configuration
 const PAYMENT_METHODS = {
@@ -28,53 +27,27 @@ const PAYMENT_METHODS = {
     textColor: "text-blue-800",
     accentColor: "bg-blue-500",
   },
-  card: {
-    id: "card",
-    name: "Credit/Debit Card",
-    description: "Visa, Mastercard, RuPay accepted",
-    icon: "💳",
-    bgColor: "bg-purple-50",
-    borderColor: "border-purple-200",
-    textColor: "text-purple-800",
-    accentColor: "bg-purple-500",
-  },
-  upi: {
-    id: "upi",
-    name: "UPI",
-    description: "Google Pay, PhonePe, Paytm",
-    icon: "📱",
-    bgColor: "bg-indigo-50",
-    borderColor: "border-indigo-200",
-    textColor: "text-indigo-800",
-    accentColor: "bg-indigo-500",
-  },
 };
 
-// Coupon validation API endpoint
-const COUPON_API = "https://store.agtechscript.in/api/coupons/validate";
+// API endpoints
+const WORKER_URL = "https://store.agtechscript.in";
+const MAIN_API = "https://api.agtechscript.in";
+const COUPON_API = `${WORKER_URL}/api/coupons/validate`;
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { cart, subtotal, discount, total, itemCount, clearCart } = useCart();
-  const { user, isAuthenticated, checkAuthViaCookies } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const toast = useToast();
 
   // Form state
   const [form, setForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    city: "",
-    state: "",
-    pincode: "",
-    landmark: "",
+    name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "", landmark: "",
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [placed, setPlaced] = useState(false);
   const [orderData, setOrderData] = useState(null);
-  const [userId, setUserId] = useState(null);
 
   // Coupon state
   const [couponCode, setCouponCode] = useState("");
@@ -86,37 +59,37 @@ export default function CheckoutPage() {
   const [selectedPayment, setSelectedPayment] = useState("cod");
   const [paymentProcessing, setPaymentProcessing] = useState(false);
 
-  // Delivery pincode check
+  // Delivery check
   const [pincodeValid, setPincodeValid] = useState(null);
   const [pincodeChecking, setPincodeChecking] = useState(false);
 
- // In CheckoutPage.jsx - fetch user profile similarly
-useEffect(() => {
-  const fetchUserProfile = async () => {
-    if (isAuthenticated && user?.user_id) {
-      try {
-        const res = await fetch(`https://api.agtechscript.in/api/user/profile?user_id=${user.user_id}`, {
-          credentials: "include"
-        });
-        const data = await res.json();
-        if (data.success) {
-          setForm(prev => ({
-            ...prev,
-            name: data.name || prev.name,
-            email: data.email || prev.email,
-            phone: data.phone || prev.phone,
-            address: data.address || prev.address,
-          }));
+  // Load user profile from main API
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (isAuthenticated && user?.user_id) {
+        try {
+          const res = await fetch(`${MAIN_API}/api/user/profile?user_id=${user.user_id}`, {
+            credentials: "include"
+          });
+          const data = await res.json();
+          if (data.success) {
+            setForm(prev => ({
+              ...prev,
+              name: data.name || prev.name,
+              email: data.email || prev.email,
+              phone: data.phone || prev.phone,
+              address: data.address || prev.address,
+            }));
+          }
+        } catch (err) {
+          console.error("Failed to fetch profile:", err);
         }
-      } catch (err) {
-        console.error("Failed to fetch profile:", err);
       }
-    }
-  };
-  fetchUserProfile();
-}, [isAuthenticated, user]);
+    };
+    fetchUserProfile();
+  }, [isAuthenticated, user]);
 
-  // Cart empty check
+  // Empty cart check
   if (cart.length === 0 && !placed) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4">
@@ -143,29 +116,27 @@ useEffect(() => {
     return errs;
   }
 
-  // Handle form change
   function handleChange(e) {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+    setForm(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: "" }));
   }
 
-  // Validate pincode
+  // Pincode validation
   async function handlePincodeBlur() {
     if (!form.pincode || !/^\d{6}$/.test(form.pincode)) return;
 
     setPincodeChecking(true);
     try {
-      // Call your pincode validation API
-      const res = await fetch(`https://api.agtechscript.in/api/pincode/${form.pincode}`);
+      const res = await fetch(`${MAIN_API}/api/pincode/${form.pincode}`);
       const data = await res.json();
       if (data.valid) {
         setPincodeValid(true);
-        if (!form.city) setForm((prev) => ({ ...prev, city: data.city || "" }));
-        if (!form.state) setForm((prev) => ({ ...prev, state: data.state || "" }));
+        if (!form.city) setForm(prev => ({ ...prev, city: data.city || "" }));
+        if (!form.state) setForm(prev => ({ ...prev, state: data.state || "" }));
       } else {
         setPincodeValid(false);
-        setErrors((prev) => ({ ...prev, pincode: "Delivery not available at this pincode" }));
+        setErrors(prev => ({ ...prev, pincode: "Delivery not available" }));
       }
     } catch (err) {
       setPincodeValid(null);
@@ -174,7 +145,7 @@ useEffect(() => {
     }
   }
 
-  // Validate coupon
+  // Coupon validation
   async function applyCoupon() {
     if (!couponCode.trim()) {
       setCouponError("Please enter a coupon code");
@@ -192,8 +163,6 @@ useEffect(() => {
       if (data.valid) {
         setCouponApplied({
           code: couponCode,
-          type: data.type, // 'percentage' or 'fixed'
-          value: data.value,
           discountAmount: data.discountAmount,
         });
         toast.success(`Coupon applied! You saved ${formatPrice(data.discountAmount)}`);
@@ -201,7 +170,7 @@ useEffect(() => {
         setCouponError(data.message || "Invalid coupon code");
       }
     } catch (err) {
-      setCouponError("Failed to validate coupon. Please try again.");
+      setCouponError("Failed to validate coupon");
     } finally {
       setCouponLoading(false);
     }
@@ -213,78 +182,74 @@ useEffect(() => {
     setCouponError("");
   }
 
-  // Calculate final total with coupon
-  const finalTotal = couponApplied
-    ? total - (couponApplied.discountAmount || 0)
-    : total;
-  const finalDiscount = discount + (couponApplied?.discountAmount || 0);
-
-// In CheckoutPage.jsx - Update createOrderAPI function
-async function createOrderAPI(paymentMethod, paymentId = null) {
-  const orderItems = cart.map(({ product, quantity }) => ({
-    product: {
-      id: product.product_id || product.id,
-      title: product.title,
-      thumbnail: product.thumbnail,
-      price: product.price,
-      discountPercentage: product.discountPercentage || 0,
-    },
-    quantity,
-    total: discountedPrice(product.price, product.discountPercentage) * quantity,
-  }));
-
-  // CheckoutPage.jsx - handlePlaceOrder
-
-const orderPayload = {
-  items: orderItems,
-  shippingAddress: {
-    name: form.name,         
-    phone: form.phone,
-    email: form.email,
-    address: form.address,
-    city: form.city,
-    state: form.state,
-    pincode: form.pincode,
-    landmark: form.landmark,
-  },
-  subtotal,
-  discountAmount: finalDiscount,
-  totalAmount: finalTotal,
-  couponCode: couponApplied?.code || null,
-  paymentMethod: selectedPayment,
-  // Don't send userId - backend will get from cookie
-};
-
-  console.log("Sending order:", orderPayload); // Debug log
-
-  const response = await fetch('https://store.agtechscript.in/api/orders', {
-    method: "POST",
-    credentials: "include",  // Important: sends cookies
-    headers: { 
-      "Content-Type": "application/json",
-      "X-Client-Host": window.location.hostname
-    },
-    body: JSON.stringify(orderPayload)
-  });
-
-  const data = await response.json();
-  console.log("Order response:", data); // Debug log
-  
-  if (!response.ok) {
-    throw new Error(data.error || "Order creation failed");
+  // Load Razorpay script
+  function loadRazorpayScript() {
+    return new Promise((resolve) => {
+      if (window.Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
   }
-  
-  return data;
-}
+
+  // Create order in backend
+  async function createOrderAPI(paymentMethod, paymentId = null) {
+    const orderItems = cart.map(({ product, quantity }) => ({
+      product: {
+        id: product.product_id || product.id,
+        title: product.title,
+        thumbnail: product.thumbnail,
+        price: product.price,
+        discountPercentage: product.discountPercentage || 0,
+      },
+      quantity,
+      total: discountedPrice(product.price, product.discountPercentage) * quantity,
+    }));
+
+    const finalTotal = couponApplied ? total - couponApplied.discountAmount : total;
+    const finalDiscount = discount + (couponApplied?.discountAmount || 0);
+
+    const orderPayload = {
+      items: orderItems,
+      shippingAddress: {
+        name: form.name,
+        phone: form.phone,
+        email: form.email,
+        address: form.address,
+        city: form.city,
+        state: form.state,
+        pincode: form.pincode,
+        landmark: form.landmark,
+      },
+      subtotal,
+      discountAmount: finalDiscount,
+      totalAmount: finalTotal,
+      couponCode: couponApplied?.code || null,
+      paymentMethod,
+      paymentId,
+    };
+
+    const response = await fetch(`${WORKER_URL}/api/orders`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(orderPayload),
+    });
+
+    return response.json();
+  }
 
   // Handle COD order
   async function handleCODOrder() {
     setLoading(true);
     try {
       const result = await createOrderAPI("cod");
-
       if (result.success) {
-        // Clear cart and save order
         clearCart();
         setOrderData({
           orderId: result.order.orderId,
@@ -297,7 +262,6 @@ const orderPayload = {
         toast.error(result.error || "Failed to place order");
       }
     } catch (err) {
-      console.error("Order error:", err);
       toast.error("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -309,69 +273,72 @@ const orderPayload = {
     setPaymentProcessing(true);
 
     try {
-      // Step 1: Create order in backend and get Razorpay order ID
-      const orderResponse = await fetch("https://store.agtechscript.in/api/payments/create-order", {
+      const finalTotal = couponApplied ? total - couponApplied.discountAmount : total;
+
+      // Step 1: Create Razorpay order
+      const orderRes = await fetch(`${WORKER_URL}/api/payments/create-order`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: finalTotal,
           currency: "INR",
           receipt: `order_${Date.now()}`,
-          notes: {
-            userId: userId || "guest",
-            coupon: couponApplied?.code || null,
-          },
         }),
       });
 
-      const orderData = await orderResponse.json();
+      const razorOrder = await orderRes.json();
+      if (!razorOrder.success) throw new Error(razorOrder.error);
 
-      if (!orderData.success) {
-        throw new Error(orderData.error || "Failed to create payment order");
-      }
-
-      // Step 2: Load Razorpay SDK and open payment modal
+      // Step 2: Load Razorpay script
       await loadRazorpayScript();
 
+      // Step 3: Open Razorpay checkout
       const options = {
-        key: orderData.keyId,
-        amount: orderData.amount,
-        currency: orderData.currency,
+        key: razorOrder.keyId,
+        amount: razorOrder.amount,
+        currency: razorOrder.currency,
         name: "AG TechScript Store",
-        description: `Order #${orderData.orderId}`,
-        order_id: orderData.razorpayOrderId,
+        description: `Order Payment`,
+        order_id: razorOrder.razorpayOrderId,
         handler: async (response) => {
-          // Step 3: Verify payment and create order
-          const verifyResult = await fetch("https://store.agtechscript.in/api/payments/verify", {
+          // Step 4: Verify payment and create order
+          const orderItems = cart.map(({ product, quantity }) => ({
+            product: {
+              id: product.product_id || product.id,
+              title: product.title,
+              thumbnail: product.thumbnail,
+              price: product.price,
+              discountPercentage: product.discountPercentage || 0,
+            },
+            quantity,
+            total: discountedPrice(product.price, product.discountPercentage) * quantity,
+          }));
+
+          const finalTotalOrder = couponApplied ? total - couponApplied.discountAmount : total;
+          const finalDiscountOrder = discount + (couponApplied?.discountAmount || 0);
+
+          const verifyRes = await fetch(`${WORKER_URL}/api/payments/verify`, {
             method: "POST",
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_signature: response.razorpay_signature,
               orderData: {
-                items: cart.map(({ product, quantity }) => ({
-                  product: {
-                    id: product.product_id || product.id,
-                    title: product.title,
-                    thumbnail: product.thumbnail,
-                    price: product.price,
-                    discountPercentage: product.discountPercentage || 0,
-                  },
-                  quantity,
-                  total: discountedPrice(product.price, product.discountPercentage) * quantity,
-                })),
+                items: orderItems,
                 shippingAddress: form,
                 subtotal,
-                discountAmount: finalDiscount,
-                totalAmount: finalTotal,
+                discountAmount: finalDiscountOrder,
+                totalAmount: finalTotalOrder,
                 couponCode: couponApplied?.code || null,
-                userId,
+                paymentMethod: "razorpay",
               },
             }),
           });
 
-          const verifyData = await verifyResult.json();
+          const verifyData = await verifyRes.json();
 
           if (verifyData.success) {
             clearCart();
@@ -392,9 +359,7 @@ const orderPayload = {
           email: form.email,
           contact: form.phone,
         },
-        theme: {
-          color: "#0047ff",
-        },
+        theme: { color: "#0047ff" },
         modal: {
           ondismiss: () => {
             setPaymentProcessing(false);
@@ -412,22 +377,7 @@ const orderPayload = {
     }
   }
 
-  // Load Razorpay SDK
-  function loadRazorpayScript() {
-    return new Promise((resolve) => {
-      if (window.Razorpay) {
-        resolve(true);
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  }
-
-  // Handle order placement based on payment method
+  // Main place order handler
   async function handlePlaceOrder(e) {
     e.preventDefault();
 
@@ -445,10 +395,14 @@ const orderPayload = {
 
     if (selectedPayment === "cod") {
       await handleCODOrder();
-    } else if (selectedPayment === "razorpay" || selectedPayment === "card" || selectedPayment === "upi") {
+    } else if (selectedPayment === "razorpay") {
       await handleRazorpayPayment();
     }
   }
+
+  // Final calculations
+  const finalTotal = couponApplied ? total - couponApplied.discountAmount : total;
+  const finalDiscount = discount + (couponApplied?.discountAmount || 0);
 
   // Success screen
   if (placed) {
@@ -499,7 +453,6 @@ const orderPayload = {
               <span className="w-7 h-7 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-bold">1</span>
               Delivery Address
             </h2>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Full Name*" name="name" value={form.name} onChange={handleChange} error={errors.name} />
               <Field label="Phone Number*" name="phone" value={form.phone} onChange={handleChange} error={errors.phone} type="tel" />
@@ -509,19 +462,9 @@ const orderPayload = {
               <Field label="City*" name="city" value={form.city} onChange={handleChange} error={errors.city} />
               <Field label="State*" name="state" value={form.state} onChange={handleChange} error={errors.state} />
               <div>
-                <Field
-                  label="Pincode*"
-                  name="pincode"
-                  value={form.pincode}
-                  onChange={handleChange}
-                  onBlur={handlePincodeBlur}
-                  error={errors.pincode}
-                  maxLength={6}
-                />
+                <Field label="Pincode*" name="pincode" value={form.pincode} onChange={handleChange} onBlur={handlePincodeBlur} error={errors.pincode} maxLength={6} />
                 {pincodeChecking && <p className="text-xs text-gray-400 mt-1">Checking...</p>}
-                {pincodeValid === true && !errors.pincode && (
-                  <p className="text-xs text-emerald-600 mt-1">✓ Delivery available</p>
-                )}
+                {pincodeValid === true && !errors.pincode && <p className="text-xs text-emerald-600 mt-1">✓ Delivery available</p>}
               </div>
             </div>
           </div>
@@ -532,31 +475,14 @@ const orderPayload = {
               <span className="w-7 h-7 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-bold">2</span>
               Have a Coupon?
             </h2>
-
             <div className="flex gap-2">
-              <input
-                type="text"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                placeholder="Enter coupon code"
-                disabled={!!couponApplied}
-                className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 disabled:bg-gray-100"
-              />
+              <input type="text" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} placeholder="Enter coupon code" disabled={!!couponApplied} className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 disabled:bg-gray-100" />
               {!couponApplied ? (
-                <button
-                  type="button"
-                  onClick={applyCoupon}
-                  disabled={couponLoading}
-                  className="px-5 py-2.5 bg-primary-500 text-white rounded-xl text-sm font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50"
-                >
+                <button type="button" onClick={applyCoupon} disabled={couponLoading} className="px-5 py-2.5 bg-primary-500 text-white rounded-xl text-sm font-semibold hover:bg-primary-600 disabled:opacity-50">
                   {couponLoading ? "Applying..." : "Apply"}
                 </button>
               ) : (
-                <button
-                  type="button"
-                  onClick={removeCoupon}
-                  className="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-300 transition-colors"
-                >
+                <button type="button" onClick={removeCoupon} className="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-300">
                   Remove
                 </button>
               )}
@@ -564,12 +490,8 @@ const orderPayload = {
             {couponError && <p className="text-red-500 text-xs mt-2">{couponError}</p>}
             {couponApplied && (
               <div className="mt-3 bg-emerald-50 rounded-xl p-3 border border-emerald-200">
-                <p className="text-sm font-semibold text-emerald-700">
-                  ✓ Coupon "{couponApplied.code}" applied!
-                </p>
-                <p className="text-xs text-emerald-600">
-                  You saved {formatPrice(couponApplied.discountAmount)}
-                </p>
+                <p className="text-sm font-semibold text-emerald-700">✓ Coupon "{couponApplied.code}" applied!</p>
+                <p className="text-xs text-emerald-600">You saved {formatPrice(couponApplied.discountAmount)}</p>
               </div>
             )}
           </div>
@@ -580,35 +502,16 @@ const orderPayload = {
               <span className="w-7 h-7 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-bold">3</span>
               Payment Method
             </h2>
-
             <div className="space-y-3">
               {Object.values(PAYMENT_METHODS).map((method) => (
-                <div
-                  key={method.id}
-                  onClick={() => setSelectedPayment(method.id)}
-                  className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                    selectedPayment === method.id
-                      ? `${method.bgColor} ${method.borderColor} border-opacity-100`
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-2xl">
-                    {method.icon}
-                  </div>
+                <div key={method.id} onClick={() => setSelectedPayment(method.id)} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${selectedPayment === method.id ? `${method.bgColor} ${method.borderColor}` : "border-gray-200 hover:border-gray-300"}`}>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-2xl">{method.icon}</div>
                   <div className="flex-1">
                     <p className={`text-sm font-bold ${method.textColor}`}>{method.name}</p>
                     <p className="text-xs text-gray-500">{method.description}</p>
                   </div>
-                  <div className={`w-5 h-5 rounded-full border-2 ${
-                    selectedPayment === method.id
-                      ? `${method.accentColor} border-transparent`
-                      : "border-gray-300"
-                  } flex items-center justify-center`}>
-                    {selectedPayment === method.id && (
-                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
+                  <div className={`w-5 h-5 rounded-full border-2 ${selectedPayment === method.id ? `${method.accentColor} border-transparent` : "border-gray-300"} flex items-center justify-center`}>
+                    {selectedPayment === method.id && <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
                   </div>
                 </div>
               ))}
@@ -616,17 +519,10 @@ const orderPayload = {
           </div>
 
           {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading || paymentProcessing}
-            className="w-full py-4 bg-primary-500 text-white font-bold rounded-xl hover:bg-primary-600 active:scale-[0.98] transition-all disabled:opacity-70 text-base flex items-center justify-center gap-2"
-          >
+          <button type="submit" disabled={loading || paymentProcessing} className="w-full py-4 bg-primary-500 text-white font-bold rounded-xl hover:bg-primary-600 active:scale-[0.98] transition-all disabled:opacity-70 text-base flex items-center justify-center gap-2">
             {loading || paymentProcessing ? (
               <>
-                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                 {paymentProcessing ? "Redirecting to Payment..." : "Placing Order..."}
               </>
             ) : (
@@ -638,65 +534,29 @@ const orderPayload = {
         {/* Order Summary */}
         <div className="space-y-4">
           <div className="bg-white rounded-2xl shadow-card p-4 sticky top-20">
-            <h2 className="font-display font-bold text-gray-900 mb-3">
-              Order Summary ({itemCount} items)
-            </h2>
+            <h2 className="font-display font-bold text-gray-900 mb-3">Order Summary ({itemCount} items)</h2>
             <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
               {cart.map(({ product, quantity }) => (
                 <div key={product.id} className="flex gap-2.5">
-                  <img
-                    src={product.thumbnail}
-                    alt={product.title}
-                    className="w-12 h-12 object-cover rounded-lg bg-gray-100 border border-gray-100 shrink-0"
-                    onError={(e) => { e.target.src = "https://placehold.co/60x60/f3f4f6/9ca3af"; }}
-                  />
+                  <img src={product.thumbnail} alt={product.title} className="w-12 h-12 object-cover rounded-lg bg-gray-100 border border-gray-100 shrink-0" onError={(e) => { e.target.src = "https://placehold.co/60x60/f3f4f6/9ca3af"; }} />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-gray-800 line-clamp-2 leading-snug">{product.title}</p>
                     <div className="flex items-center justify-between mt-0.5">
                       <span className="text-xs text-gray-500">×{quantity}</span>
-                      <span className="text-xs font-bold text-gray-900">
-                        {formatPrice(discountedPrice(product.price, product.discountPercentage) * quantity)}
-                      </span>
+                      <span className="text-xs font-bold text-gray-900">{formatPrice(discountedPrice(product.price, product.discountPercentage) * quantity)}</span>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-
             <div className="border-t border-gray-100 mt-3 pt-3 space-y-1.5">
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>Subtotal</span>
-                <span>{formatPrice(subtotal)}</span>
-              </div>
-              {discount > 0 && (
-                <div className="flex justify-between text-sm text-emerald-600">
-                  <span>Discount</span>
-                  <span>−{formatPrice(discount)}</span>
-                </div>
-              )}
-              {couponApplied && (
-                <div className="flex justify-between text-sm text-emerald-600">
-                  <span>Coupon Discount</span>
-                  <span>−{formatPrice(couponApplied.discountAmount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>Delivery</span>
-                <span className="text-emerald-600 font-medium">FREE</span>
-              </div>
-              <div className="flex justify-between text-base font-bold text-gray-900 pt-2 border-t border-gray-200">
-                <span>Total</span>
-                <span className="font-display">{formatPrice(finalTotal)}</span>
-              </div>
+              <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div>
+              {discount > 0 && <div className="flex justify-between text-sm text-emerald-600"><span>Discount</span><span>−{formatPrice(discount)}</span></div>}
+              {couponApplied && <div className="flex justify-between text-sm text-emerald-600"><span>Coupon</span><span>−{formatPrice(couponApplied.discountAmount)}</span></div>}
+              <div className="flex justify-between text-sm text-gray-600"><span>Delivery</span><span className="text-emerald-600">FREE</span></div>
+              <div className="flex justify-between text-base font-bold text-gray-900 pt-2 border-t border-gray-200"><span>Total</span><span className="font-display">{formatPrice(finalTotal)}</span></div>
             </div>
-
-            {finalDiscount > 0 && (
-              <div className="mt-3 bg-emerald-50 rounded-xl p-2.5 text-center">
-                <p className="text-xs text-emerald-700 font-semibold">
-                  🎉 You save {formatPrice(finalDiscount)} on this order!
-                </p>
-              </div>
-            )}
+            {finalDiscount > 0 && <div className="mt-3 bg-emerald-50 rounded-xl p-2.5 text-center"><p className="text-xs text-emerald-700 font-semibold">🎉 You save {formatPrice(finalDiscount)} on this order!</p></div>}
           </div>
         </div>
       </div>
@@ -709,19 +569,7 @@ function Field({ label, name, value, onChange, onBlur, error, type = "text", cla
   return (
     <div className={className}>
       <label className="block text-xs font-semibold text-gray-700 mb-1">{label}</label>
-      <input
-        type={type}
-        name={name}
-        value={value}
-        onChange={onChange}
-        onBlur={onBlur}
-        maxLength={maxLength}
-        className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 transition-all ${
-          error
-            ? "border-red-300 focus:ring-red-300 bg-red-50"
-            : "border-gray-200 focus:ring-primary-300"
-        }`}
-      />
+      <input type={type} name={name} value={value} onChange={onChange} onBlur={onBlur} maxLength={maxLength} className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 transition-all ${error ? "border-red-300 focus:ring-red-300 bg-red-50" : "border-gray-200 focus:ring-primary-300"}`} />
       {error && <p className="text-red-500 text-xs mt-0.5">{error}</p>}
     </div>
   );
