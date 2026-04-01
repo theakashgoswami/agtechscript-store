@@ -236,8 +236,7 @@ export default function Header() {
         <div className="ag-header-inner">
           {/* Logo Section */}
           <div className="ag-logo-section">
-            <Link to="https://agtechscript.in" className="ag-logo-link" onClick={handleLinkClick} target="_blank">
-              <img
+               <img
                 src="https://cdn.agtechscript.in/AGTechScript.webp"
                 alt="AG TechScript"
                 className="ag-logo-img"
@@ -246,6 +245,7 @@ export default function Header() {
                   e.target.src = "https://placehold.co/60x60/0047ff/white?text=AG";
                 }}
               />
+               <Link to="https://agtechscript.in" className="ag-logo-link" onClick={handleLinkClick} target="_blank">
               <span className="ag-logo-text">AG TechScript</span>
             </Link>
 
