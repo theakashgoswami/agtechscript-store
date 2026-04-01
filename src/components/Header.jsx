@@ -189,15 +189,18 @@ export default function Header() {
     closeAllMenus();
   }
 
-  // Toggle mobile menu
-  function toggleMobileMenu() {
-    setMobileMenuOpen(!mobileMenuOpen);
-    // Reset dropdowns when opening mobile menu
-    if (!mobileMenuOpen) {
+// Toggle mobile menu - FIXED
+function toggleMobileMenu() {
+  setMobileMenuOpen(prev => {
+    const newState = !prev;
+    // Reset dropdowns ONLY when closing the menu
+    if (!newState) {
       setUserMenuOpen(false);
       setCategoryOpen(false);
     }
-  }
+    return newState;
+  });
+}
 
   return (
     <>
