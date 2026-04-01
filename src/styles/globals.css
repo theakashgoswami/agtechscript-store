@@ -37,6 +37,7 @@ body.dark-mode {
   background: linear-gradient(90deg,#1a1f3a 25%,#222840 50%,#1a1f3a 75%);
   background-size: 700px 100%;
 }
+
 /* ===== AGTECHSCRIPT STYLE HEADER ===== */
 .ag-header {
   position: fixed;
@@ -49,7 +50,6 @@ body.dark-mode {
   border-radius: 0 0 18px 18px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   transition: transform 0.3s ease;
-  /* 🔥 FIX: Remove overflow hidden so dropdowns can show */
   overflow: visible;
 }
 
@@ -57,7 +57,7 @@ body.dark-mode {
   transform: translateY(-100%);
 }
 
-/* Shine Effect - Keep but ensure it doesn't block clicks */
+/* Shine Effect */
 .ag-shine-effect {
   position: absolute;
   top: 0;
@@ -88,7 +88,7 @@ body.dark-mode {
   flex-wrap: wrap;
 }
 
-/* Logo Section */
+/* Logo Section - FIXED */
 .ag-logo-section {
   display: flex;
   align-items: center;
@@ -158,7 +158,7 @@ body.dark-mode {
   color: #fff;
 }
 
-/* 🔥 DROPDOWN - FIXED POSITIONING */
+/* Dropdown */
 .ag-dropdown {
   position: relative;
   z-index: 1000;
@@ -189,15 +189,18 @@ body.dark-mode {
   display: block;
 }
 
-/* Hover effect for desktop */
+/* Desktop hover */
 @media (min-width: 769px) {
   .ag-dropdown:hover .ag-dropdown-menu {
     display: block;
   }
 }
 
-.ag-dropdown-menu a {
+.ag-dropdown-menu a,
+.ag-dropdown-item-link {
   display: block;
+  width: 100%;
+  text-align: left;
   padding: 12px 18px;
   color: #e0e8ff;
   text-decoration: none;
@@ -205,22 +208,19 @@ body.dark-mode {
   transition: background 0.2s;
   white-space: nowrap;
   background: transparent !important;
+  border: none;
+  cursor: pointer;
 }
 
-.ag-dropdown-menu a:hover {
+.ag-dropdown-menu a:hover,
+.ag-dropdown-item-link:hover {
   background: rgba(0, 230, 255, 0.15) !important;
   color: #fff;
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Search Form */
@@ -263,7 +263,7 @@ body.dark-mode {
   background: rgba(0, 230, 255, 0.35);
 }
 
-/* 🔥 USER MENU - FIXED POSITIONING */
+/* User Menu */
 .ag-user-wrapper {
   position: relative;
   z-index: 1000;
@@ -297,7 +297,7 @@ body.dark-mode {
   box-shadow: 0 0 10px rgba(0, 230, 255, 0.4);
 }
 
-/* 🔥 USER DROPDOWN - FIXED */
+/* User Dropdown */
 .ag-user-dropdown {
   position: absolute;
   right: 0;
@@ -393,6 +393,7 @@ body.dark-mode {
 /* Mobile Hamburger */
 .ag-hamburger {
   display: none;
+  background: rgba(255, 255, 255, 0.1);
   border: none;
   color: #fff;
   font-size: 1.5rem;
@@ -409,11 +410,12 @@ body.dark-mode {
 }
 
 @media (max-width: 768px) {
+  /* FIXED: Logo section gap */
   .ag-logo-section {
-  display: flex;
-  align-items: center;
-  gap: 20vw;
-}
+    gap: 12px;
+    flex: 1;
+  }
+  
   .ag-hamburger {
     display: flex !important;
   }
@@ -432,21 +434,40 @@ body.dark-mode {
     border-radius: 0 0 18px 18px;
     backdrop-filter: blur(10px);
     z-index: 9999;
+    max-height: 80vh;
+    overflow-y: auto;
   }
 
   .ag-nav.ag-nav-open {
     display: flex !important;
   }
 
+  /* Mobile nav items - full width */
+  .ag-nav-link,
+  .ag-dropdown-trigger,
+  .ag-cart-btn,
   .ag-search-form {
     width: 100%;
+  }
+
+  .ag-search-form {
+    margin: 4px 0;
   }
 
   .ag-search-input {
     width: 100% !important;
   }
 
-  /* Mobile dropdown fix */
+  /* Mobile dropdown - always full width, static position */
+  .ag-dropdown {
+    width: 100%;
+  }
+  
+  .ag-dropdown-trigger {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
   .ag-dropdown-menu {
     position: static !important;
     display: none;
@@ -454,23 +475,31 @@ body.dark-mode {
     max-height: 300px;
     box-shadow: none;
     border: 1px solid rgba(0, 71, 255, 0.3);
+    width: 100%;
   }
 
   .ag-dropdown-menu.show {
     display: block;
   }
 
-  .ag-dropdown:hover .ag-dropdown-menu {
-    display: none;
+  /* User dropdown on mobile */
+  .ag-user-wrapper {
+    width: 100%;
   }
-
+  
+  .ag-user-btn {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 12px;
+    border-radius: 30px;
+    padding: 8px 16px;
+  }
+  
   .ag-user-dropdown {
-    position: fixed;
-    right: 20px;
-    left: auto;
-    top: auto;
-    bottom: auto;
+    position: static !important;
     margin-top: 8px;
+    width: 100%;
+    box-shadow: none;
   }
 
   .ag-logo-text {
@@ -499,20 +528,16 @@ body.dark-mode {
   }
 
   .ag-user-btn {
-    width: 35px;
-    height: 35px;
+    width: 100%;
+    height: auto;
   }
 
   .ag-header-spacer {
     height: 68px;
   }
-
-  .ag-user-dropdown {
-    right: 10px;
-    min-width: 200px;
-  }
 }
-/* Glass Card */
+
+/* Rest of your CSS (glass-card, product-card, footer etc remains same) */
 .glass-card {
   background: rgba(255,255,255,0.88);
   backdrop-filter: blur(10px);
@@ -585,7 +610,8 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
   .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   .glass { background:rgba(255,255,255,0.08); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.15); }
 }
-/*===== FOOTER =====*/
+
+/* ===== FOOTER ===== */
 .site-footer {
   background: linear-gradient(135deg, #0a0f2c, #1a1f4a, #0047ff);
   color: #fff;
@@ -836,7 +862,7 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
   gap: 6px;
 }
 
-/* Responsive */
+/* Responsive Footer */
 @media (max-width: 1024px) {
   .footer-main {
     grid-template-columns: 1fr 1fr;
