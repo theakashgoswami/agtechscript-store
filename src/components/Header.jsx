@@ -1,3 +1,4 @@
+// components/Header.jsx
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useCart } from "../context/CartContext";
@@ -6,18 +7,19 @@ import { debounce } from "../utils/format";
 import CartDrawer from "./CartDrawer";
 
 const CATEGORIES_LABELS = {
-  smartphones:      "📱 Smartphones",
-  skincare:         "✨ Skincare",
-  fragrances:       "🌸 Fragrances",
-  groceries:        "🛒 Groceries",
-  furniture:        "🛋️ Furniture",
-  "home-decoration":"🏠 Home Decor",
-  "mens-shirts":    "👔 Men's Shirts",
-  "mens-shoes":     "👟 Men's Shoes",
+  smartphones: "📱 Smartphones",
+  laptops: "💻 Laptops",
+  skincare: "✨ Skincare",
+  fragrances: "🌸 Fragrances",
+  groceries: "🛒 Groceries",
+  furniture: "🛋️ Furniture",
+  "home-decoration": "🏠 Home Decor",
+  "mens-shirts": "👔 Men's Shirts",
+  "mens-shoes": "👟 Men's Shoes",
   "womens-dresses": "👗 Women's Dresses",
-  "womens-shoes":   "👠 Women's Shoes",
-  sunglasses:       "🕶️ Sunglasses",
-  automotive:       "🚗 Automotive",
+  "womens-shoes": "👠 Women's Shoes",
+  sunglasses: "🕶️ Sunglasses",
+  automotive: "🚗 Automotive",
 };
 
 export default function Header() {
@@ -25,6 +27,7 @@ export default function Header() {
   const location = useLocation();
   const userMenuRef = useRef(null);
   const categoryRef = useRef(null);
+  const mobileMenuRef = useRef(null);
 
   const { itemCount } = useCart();
   const { user, isAuthenticated, logout, requireAuth, refreshAuth } = useAuth();
@@ -36,9 +39,43 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
 
-  // ── Check auth when returning from main site ─────────────────
+  // ── Close all menus when clicking outside ─────────────────────────
   useEffect(() => {
-    // Check if we came back from login
+    function handleClickOutside(e) {
+      // Close user dropdown if click outside
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setUserMenuOpen(false);
+      }
+      
+      // Close category dropdown if click outside
+      if (categoryRef.current && !categoryRef.current.contains(e.target)) {
+        setCategoryOpen(false);
+      }
+      
+      // Close mobile menu if click outside and menu is open
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target) && mobileMenuOpen) {
+        setMobileMenuOpen(false);
+      }
+    }
+    
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [mobileMenuOpen]);
+
+  // ── Close mobile menu when navigating (page change) ───────────────
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setUserMenuOpen(false);
+    setCategoryOpen(false);
+  }, [location.pathname]);
+
+  // ── Close mobile menu when clicking on any link inside it ──────────
+  const handleMobileLinkClick = () => {
+    setMobileMenuOpen(false);
+  };
+
+  // ── Check auth when returning from main site ───────────────────────
+  useEffect(() => {
     const returnUrl = sessionStorage.getItem("returnAfterLogin");
     if (returnUrl) {
       sessionStorage.removeItem("returnAfterLogin");
@@ -46,27 +83,13 @@ export default function Header() {
     }
   }, [refreshAuth]);
 
-  // ── Sync search bar with URL ─────────────────────────────────
+  // ── Sync search bar with URL ───────────────────────────────────────
   useEffect(() => {
     const q = new URLSearchParams(location.search).get("q") || "";
     setSearchQuery(q);
   }, [location.search]);
 
-  // ── Close dropdowns on outside click ─────────────────────────
-  useEffect(() => {
-    function handleClick(e) {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
-        setUserMenuOpen(false);
-      }
-      if (categoryRef.current && !categoryRef.current.contains(e.target)) {
-        setCategoryOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  // ── Hide header on scroll down ───────────────────────────────
+  // ── Hide header on scroll down ─────────────────────────────────────
   useEffect(() => {
     let lastScroll = 0;
     function handleScroll() {
@@ -78,7 +101,7 @@ export default function Header() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // ── Search ───────────────────────────────────────────────────
+  // ── Search ─────────────────────────────────────────────────────────
   const handleSearch = debounce((q) => {
     if (q.trim()) navigate(`/search?q=${encodeURIComponent(q.trim())}`);
   }, 400);
@@ -87,17 +110,20 @@ export default function Header() {
     e.preventDefault();
     if (searchQuery.trim())
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    // Close mobile menu after search
+    setMobileMenuOpen(false);
   }
 
-  // ── User actions ─────────────────────────────────────────────
+  // ── User actions ───────────────────────────────────────────────────
   function handleUserClick() {
     if (isAuthenticated) {
       setUserMenuOpen((v) => !v);
     } else {
-      // Store return URL in sessionStorage (clears after session)
       sessionStorage.setItem("returnAfterLogin", window.location.href);
       window.location.href = "https://agtechscript.in#login";
     }
+    // Close mobile menu
+    setMobileMenuOpen(false);
   }
 
   function handleOrders() {
@@ -105,6 +131,7 @@ export default function Header() {
       navigate("/orders");
     }
     setUserMenuOpen(false);
+    setMobileMenuOpen(false);
   }
 
   function handleProfile() {
@@ -112,11 +139,19 @@ export default function Header() {
       window.location.href = "https://account.agtechscript.in";
     }
     setUserMenuOpen(false);
+    setMobileMenuOpen(false);
   }
 
   function handleLogout() {
     logout();
     setUserMenuOpen(false);
+    setMobileMenuOpen(false);
+  }
+
+  function handleCategoryClick(slug) {
+    navigate(`/category/${slug}`);
+    setCategoryOpen(false);
+    setMobileMenuOpen(false);
   }
 
   return (
@@ -127,7 +162,7 @@ export default function Header() {
         <div className="ag-header-inner">
           {/* Logo Section */}
           <div className="ag-logo-section">
-            <div  className="ag-logo-link">
+            <Link to="/" className="ag-logo-link" onClick={() => setMobileMenuOpen(false)}>
               <img
                 src="https://cdn.agtechscript.in/AGTechScript.webp"
                 alt="AG TechScript"
@@ -137,10 +172,8 @@ export default function Header() {
                   e.target.src = "https://placehold.co/60x60/0047ff/white?text=AG";
                 }}
               />
-             </div>
-              <a className="ag-logo-text" href="https://agtechscript.in" target="_blank" rel="noopener noreferrer">
-                AG TechScript
-              </a>
+              <span className="ag-logo-text">AG TechScript</span>
+            </Link>
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -152,8 +185,12 @@ export default function Header() {
           </div>
 
           {/* Navigation */}
-          <nav className={`ag-nav ${mobileMenuOpen ? "ag-nav-open" : ""}`}>
-            <NavLink to="/" onClick={() => setMobileMenuOpen(false)}>
+          <nav 
+            ref={mobileMenuRef}
+            className={`ag-nav ${mobileMenuOpen ? "ag-nav-open" : ""}`}
+          >
+            {/* Home */}
+            <NavLink to="/" onClick={handleMobileLinkClick}>
               <HomeIcon /> Home
             </NavLink>
 
@@ -167,16 +204,13 @@ export default function Header() {
               </button>
               <div className={`ag-dropdown-menu ${categoryOpen ? "show" : ""}`}>
                 {Object.entries(CATEGORIES_LABELS).map(([slug, label]) => (
-                  <Link
+                  <button
                     key={slug}
-                    to={`/category/${slug}`}
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      setCategoryOpen(false);
-                    }}
+                    onClick={() => handleCategoryClick(slug)}
+                    className="ag-dropdown-item-link"
                   >
                     {label}
-                  </Link>
+                  </button>
                 ))}
               </div>
             </div>
@@ -242,7 +276,7 @@ export default function Header() {
   );
 }
 
-// Sub-components
+// Sub-components (same as before)
 function NavLink({ to, children, onClick }) {
   return (
     <Link to={to} onClick={onClick} className="ag-nav-link">
@@ -259,7 +293,7 @@ function DropBtn({ onClick, icon, label, danger }) {
   );
 }
 
-// Icons
+// Icons (same as before)
 const HomeIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2h-5v-8H7v8H5a2 2 0 0 1-2-2z" /></svg>);
 const GridIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>);
 const SearchIcon = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>);

@@ -393,7 +393,6 @@ body.dark-mode {
 /* Mobile Hamburger */
 .ag-hamburger {
   display: none;
-  background: rgba(255, 255, 255, 0.1);
   border: none;
   color: #fff;
   font-size: 1.5rem;
@@ -410,6 +409,11 @@ body.dark-mode {
 }
 
 @media (max-width: 768px) {
+  .ag-logo-section {
+  display: flex;
+  align-items: center;
+  gap: 20vw;
+}
   .ag-hamburger {
     display: flex !important;
   }
