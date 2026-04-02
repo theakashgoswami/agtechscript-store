@@ -410,7 +410,7 @@ body.dark-mode {
 
 @media (max-width: 768px) {
   .ag-logo-section {
-    gap: 120px;
+    gap: 100px;
     flex: 1;
   }
   

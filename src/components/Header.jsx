@@ -208,10 +208,32 @@ export default function Header() {
     closeAllMenus();
   }
 
-  function handleLogout() {
-    if (logout) logout();
-    closeAllMenus();
-  }
+
+async function handleLogout() {
+    try {
+        const response = await fetch(`${MAIN_API}/api/auth/logout`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            // Clear user data
+            window.currentUser = null;
+            currentUser = null;
+            
+            // Close overlay
+            closeAllOverlays();
+            
+            // Show default icon
+            displayDefaultUserIcon();
+            
+            // Redirect
+            window.location.href = 'https://shop.agtechscript.in';
+        }
+    } catch (error) {
+        console.error('Logout failed:', error);
+    }
+}
 
   function handleCategoryClick(slug) {
     navigate(`/category/${slug}`);
