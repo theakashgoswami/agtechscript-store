@@ -135,22 +135,62 @@ export function AuthProvider({ children }) {
     return true;
   }, [isAuthenticated, loading]);
 
-  // ── Logout ──────────────────────────────────────────────────
-  const logout = useCallback(async () => {
-    try {
-      await fetch(`${API}/api/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" }
+ const logout = useCallback(async () => {
+  try {
+    // ✅ Pehle worker logout call karo
+    let workerResponse = await fetch(`${CONFIG.WORKER_URL}/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 
+        'Content-Type': 'application/json', 
+        'X-Client-Host': window.location.host 
+      },
+    });
+
+    if (!workerResponse.ok) {
+      workerResponse = await fetch(`${CONFIG.WORKER_URL}/api/auth/logout`, {
+        method: 'GET',
+        credentials: 'include',
       });
-    } catch (err) {
-      console.error("Logout error:", err);
     }
     
+    if (!workerResponse.ok) {
+      console.error('Worker logout failed:', await workerResponse.text());
+    }
+    
+    // ✅ Fir Supabase sign out (with timeout to avoid hanging)
+    const supabase = getSupabaseClient();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Supabase logout timeout')), 3000)
+    );
+    
+    await Promise.race([
+      supabase.auth.signOut({ scope: 'global' }),
+      timeoutPromise
+    ]).catch(err => console.error('Supabase logout error:', err));
+    
+  } catch (err) {
+    console.error('Logout error:', err);
+  } finally {
+    // ✅ Always clear local state and storage
+    setSupabaseToken(null);
+    lastAuthCheckRef.current = 0;
     setUser(null);
-    setIsAuthenticated(false);
-    window.dispatchEvent(new CustomEvent("auth-change", { detail: { loggedOut: true } }));
-  }, []);
+    
+    // ✅ Clear local storage items
+    localStorage.removeItem('sb-auth-token');
+    localStorage.removeItem('supabase.auth.token');
+    localStorage.removeItem('agtech-auth');
+    localStorage.removeItem('agtech-worker-supabase-token');
+    sessionStorage.clear();
+
+    const expired = 'Thu, 01 Jan 1970 00:00:00 GMT';
+    document.cookie = `auth_token=; expires=${expired}; path=/; domain=.agtechscript.in; Secure; SameSite=None`;
+    document.cookie = `auth_token=; expires=${expired}; path=/; domain=${window.location.hostname}; Secure; SameSite=None`;
+    document.cookie = `auth_token=; expires=${expired}; path=/`;
+    
+  }
+}, []);
 
   // ── Refresh Auth ────────────────────────────────────────────
   const refreshAuth = useCallback(() => {
