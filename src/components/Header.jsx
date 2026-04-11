@@ -1,450 +1,562 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { debounce } from "../utils/format";
 import CartDrawer from "./CartDrawer";
 
-const CATEGORIES_LABELS = {
-  smartphones: "📱 Smartphones",
-  laptops: "💻 Laptops",
-  skincare: "✨ Skincare",
-  fragrances: "🌸 Fragrances",
-  groceries: "🛒 Groceries",
-  furniture: "🛋️ Furniture",
-  "home-decoration": "🏠 Home Decor",
-  "mens-shirts": "👔 Men's Shirts",
-  "mens-shoes": "👟 Men's Shoes",
-  "womens-dresses": "👗 Women's Dresses",
-  "womens-shoes": "👠 Women's Shoes",
-  sunglasses: "🕶️ Sunglasses",
-  automotive: "🚗 Automotive",
-};
+const CATEGORIES = [
+  ["smartphones", "Smartphones"],
+  ["laptops", "Laptops"],
+  ["skincare", "Skincare"],
+  ["fragrances", "Fragrances"],
+  ["groceries", "Groceries"],
+  ["furniture", "Furniture"],
+  ["home-decoration", "Home Decor"],
+  ["mens-shirts", "Men's Shirts"],
+  ["mens-shoes", "Men's Shoes"],
+  ["womens-dresses", "Women's Dresses"],
+  ["womens-shoes", "Women's Shoes"],
+  ["sunglasses", "Sunglasses"],
+  ["automotive", "Automotive"],
+];
 
-// Main API endpoint for user profile
 const MAIN_API = "https://api.agtechscript.in";
+
+function classNames(...values) {
+  return values.filter(Boolean).join(" ");
+}
 
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { itemCount } = useCart();
+  const { user, isAuthenticated, logout, requireAuth, refreshAuth } = useAuth();
+
   const userMenuRef = useRef(null);
   const categoryRef = useRef(null);
   const mobileMenuRef = useRef(null);
-
-  const { itemCount } = useCart();
-  const { user, isAuthenticated, logout, requireAuth, refreshAuth } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [fullUserProfile, setFullUserProfile] = useState(null);
-  const [loadingProfile, setLoadingProfile] = useState(false);
 
-  // Check if mobile view
-  const [isMobile, setIsMobile] = useState(false);
-  
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // 🔥 Fetch full user profile from main API when user is authenticated
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (isAuthenticated && user?.user_id) {
-        setLoadingProfile(true);
-        try {
-          const response = await fetch(`${MAIN_API}/api/user/profile?user_id=${user.user_id}`, {
-            credentials: "include",
-            headers: {
-              "X-Client-Host": window.location.hostname
-            }
-          });
-          const data = await response.json();
-          if (data.success) {
-            setFullUserProfile(data);
-          }
-        } catch (err) {
-          console.error("Failed to fetch user profile:", err);
-        } finally {
-          setLoadingProfile(false);
-        }
-      }
-    };
-    
-    fetchUserProfile();
-  }, [isAuthenticated, user?.user_id]);
-
-  // ── Close all menus when clicking outside ─────────────────────────
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
-        setUserMenuOpen(false);
-      }
-      if (categoryRef.current && !categoryRef.current.contains(e.target)) {
-        setCategoryOpen(false);
-      }
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target) && mobileMenuOpen) {
-        setMobileMenuOpen(false);
-      }
-    }
-    
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [mobileMenuOpen]);
-
-  // ── Close mobile menu when navigating ───────────────────────────────
-  useEffect(() => {
+  const closeMenus = () => {
     setMobileMenuOpen(false);
     setUserMenuOpen(false);
     setCategoryOpen(false);
-  }, [location.pathname]);
+  };
 
-  // ── Check auth when returning from main site ───────────────────────
-  useEffect(() => {
-    const returnUrl = sessionStorage.getItem("returnAfterLogin");
-    if (returnUrl) {
-      sessionStorage.removeItem("returnAfterLogin");
-      if (refreshAuth) refreshAuth();
-    }
-  }, [refreshAuth]);
-
-  // ── Sync search bar with URL ───────────────────────────────────────
   useEffect(() => {
     const q = new URLSearchParams(location.search).get("q") || "";
     setSearchQuery(q);
   }, [location.search]);
 
-  // ── Hide header on scroll down ─────────────────────────────────────
   useEffect(() => {
-    let lastScroll = 0;
-    function handleScroll() {
-      const cur = window.scrollY;
-      setIsScrolled(cur > lastScroll && cur > 100);
-      lastScroll = cur;
+    const returnUrl = sessionStorage.getItem("returnAfterLogin");
+    if (returnUrl) {
+      sessionStorage.removeItem("returnAfterLogin");
+      refreshAuth?.();
     }
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+  }, [refreshAuth]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function fetchUserProfile() {
+      if (!isAuthenticated || !user?.user_id) {
+        setFullUserProfile(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${MAIN_API}/api/user/profile?user_id=${user.user_id}`, {
+          credentials: "include",
+          headers: { "X-Client-Host": window.location.hostname },
+        });
+        const data = await response.json();
+        if (!ignore && data.success) {
+          setFullUserProfile(data);
+        }
+      } catch (error) {
+        if (!ignore) {
+          setFullUserProfile(null);
+        }
+        console.error("Failed to fetch user profile:", error);
+      }
+    }
+
+    fetchUserProfile();
+
+    return () => {
+      ignore = true;
+    };
+  }, [isAuthenticated, user?.user_id]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setUserMenuOpen(false);
+      }
+      if (categoryRef.current && !categoryRef.current.contains(event.target)) {
+        setCategoryOpen(false);
+      }
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
+        setMobileMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ── Search ─────────────────────────────────────────────────────────
-  const handleSearch = debounce((q) => {
-    if (q.trim()) navigate(`/search?q=${encodeURIComponent(q.trim())}`);
-  }, 400);
+  useEffect(() => {
+    closeMenus();
+  }, [location.pathname]);
 
-  function handleSearchSubmit(e) {
-    e.preventDefault();
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value) => {
+        if (value.trim()) {
+          navigate(`/search?q=${encodeURIComponent(value.trim())}`);
+        }
+      }, 400),
+    [navigate]
+  );
+
+  const displayName = fullUserProfile?.name || user?.name || user?.user_id || "User";
+  const displayEmail = fullUserProfile?.email || user?.email || "";
+  const displayPhone = fullUserProfile?.phone || "";
+  const displayAvatar = fullUserProfile?.profile_image || user?.profile_image || "";
+
+  function handleSearchSubmit(event) {
+    event.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-    }
-    setMobileMenuOpen(false);
-  }
-
-  // ── Close all menus helper ─────────────────────────────────────────
-  const closeAllMenus = () => {
-    setMobileMenuOpen(false);
-    setUserMenuOpen(false);
-    setCategoryOpen(false);
-  };
-
-  // ── Toggle mobile menu ─────────────────────────────────────────────
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(prev => {
-      const newState = !prev;
-      if (!newState) {
-        setUserMenuOpen(false);
-        setCategoryOpen(false);
-      }
-      return newState;
-    });
-  };
-
-  // ── Mobile category toggle ─────────────────────────────────────────
-  const handleMobileCategoryClick = () => {
-    if (isMobile) {
-      setUserMenuOpen(false);
-      setCategoryOpen(!categoryOpen);
-    } else {
-      setCategoryOpen(!categoryOpen);
-    }
-  };
-
-  // ── User actions ───────────────────────────────────────────────────
-  function handleUserClick() {
-    if (isAuthenticated) {
-      if (isMobile) {
-        setCategoryOpen(false);
-        setUserMenuOpen(!userMenuOpen);
-      } else {
-        setUserMenuOpen(!userMenuOpen);
-      }
-    } else {
-      sessionStorage.setItem("returnAfterLogin", window.location.href);
-      window.location.href = "https://agtechscript.in#login";
-    }
-    if (!isMobile) {
       setMobileMenuOpen(false);
     }
   }
 
-  function handleOrders() {
-    if (requireAuth && requireAuth()) {
-      navigate("/orders");
+  function handleUserClick() {
+    if (!isAuthenticated) {
+      sessionStorage.setItem("returnAfterLogin", window.location.href);
+      window.location.href = "https://agtechscript.in#login";
+      return;
     }
-    closeAllMenus();
+
+    setUserMenuOpen((prev) => !prev);
+  }
+
+  function handleOrders() {
+    if (requireAuth?.()) {
+      navigate("/orders");
+      closeMenus();
+    }
   }
 
   function handleProfile() {
-    if (requireAuth && requireAuth()) {
+    if (requireAuth?.()) {
       window.location.href = "https://account.agtechscript.in";
+      closeMenus();
     }
-    closeAllMenus();
   }
 
-
-async function handleLogout() {
+  async function handleLogout() {
     try {
-        const response = await fetch(`${MAIN_API}/api/auth/logout`, {
-            method: 'POST',
-            credentials: 'include'
-        });
-        
-        if (response.ok) {
-            // Clear user data
-            window.currentUser = null;
-            currentUser = null;
-            
-            // Close overlay
-            closeAllOverlays();
-            
-            // Show default icon
-            displayDefaultUserIcon();
-            
-            // Redirect
-            window.location.href = 'https://shop.agtechscript.in';
-        }
-    } catch (error) {
-        console.error('Logout failed:', error);
+      await logout?.();
+    } finally {
+      closeMenus();
+      window.location.href = "https://shop.agtechscript.in";
     }
-}
+  }
 
   function handleCategoryClick(slug) {
     navigate(`/category/${slug}`);
-    closeAllMenus();
+    closeMenus();
   }
 
-  function handleLinkClick() {
-    closeAllMenus();
-  }
-
-  // Get display name (prefer full profile name)
-  const displayName = fullUserProfile?.name || user?.name || user?.user_id || "User";
-  const displayEmail = fullUserProfile?.email || user?.email || "";
-  const displayPoints = fullUserProfile?.points;
-  const displayPhone = fullUserProfile?.phone;
+  const isSearchPage = location.pathname === "/search";
 
   return (
     <>
-      <header className={`ag-header ${isScrolled ? "ag-header-hidden" : ""}`}>
-        <div className="ag-shine-effect"></div>
-        
-        <div className="ag-header-inner">
-          {/* Logo Section */}
-          <div className="ag-logo-section">
-               <img
-                src="https://cdn.agtechscript.in/AGTechScript.webp"
-                alt="AG TechScript"
-                className="ag-logo-img"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = "https://placehold.co/60x60/0047ff/white?text=AG";
-                }}
-              />
-               <Link to="https://agtechscript.in" className="ag-logo-link" onClick={handleLinkClick} target="_blank">
-              <span className="ag-logo-text">AG TechScript</span>
-            </Link>
+      <header className="sticky top-0 z-50 w-full border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md">
+        <div className="mx-auto flex min-h-16 max-w-7xl items-center gap-4 px-4 py-3">
+          <Link to="/" className="flex shrink-0 items-center gap-3" onClick={closeMenus}>
+            <img
+              src="https://cdn.agtechscript.in/AGTechScript.webp"
+              alt="AG TechScript"
+              className="h-10 w-10 rounded-[10px] object-cover ring-1 ring-white/12 shadow-[0_8px_24px_rgba(0,0,0,0.28)]"
+            />
+            <span className="hidden text-lg font-bold tracking-tight text-white sm:inline">
+              AG TechScript
+            </span>
+          </Link>
 
-            <button
-              onClick={toggleMobileMenu}
-              className="ag-hamburger"
-              aria-label="Toggle menu"
+          <nav className="hidden items-center gap-5 md:flex">
+            <Link
+              to="/"
+              className={classNames(
+                "text-sm font-medium transition-colors hover:text-indigo-400",
+                location.pathname === "/" ? "text-indigo-400" : "text-zinc-400"
+              )}
             >
-              {mobileMenuOpen ? "✕" : "☰"}
-            </button>
-          </div>
-
-          {/* Navigation */}
-          <nav 
-            ref={mobileMenuRef}
-            className={`ag-nav ${mobileMenuOpen ? "ag-nav-open" : ""}`}
-          >
-            {/* Home */}
-            <Link to="/" className="ag-nav-link" onClick={handleLinkClick}>
-              <HomeIcon /> Home
+              Home
             </Link>
 
-            {/* Categories Dropdown */}
-            <div className="ag-dropdown" ref={categoryRef}>
-              <button 
-                className="ag-dropdown-trigger"
-                onClick={handleMobileCategoryClick}
+            <div className="relative" ref={categoryRef}>
+              <button
+                type="button"
+                onClick={() => setCategoryOpen((prev) => !prev)}
+                className={classNames(
+                  "inline-flex items-center gap-2 text-sm font-medium transition-colors hover:text-indigo-400",
+                  location.pathname.startsWith("/category") || categoryOpen ? "text-indigo-400" : "text-zinc-400"
+                )}
               >
-                <GridIcon /> Categories {categoryOpen ? "▴" : "▾"}
+                Categories
+                <ChevronIcon className={classNames("h-4 w-4 transition-transform", categoryOpen && "rotate-180")} />
               </button>
-              <div className={`ag-dropdown-menu ${categoryOpen ? "show" : ""}`}>
-                {Object.entries(CATEGORIES_LABELS).map(([slug, label]) => (
-                  <button
-                    key={slug}
-                    onClick={() => handleCategoryClick(slug)}
-                    className="ag-dropdown-item-link"
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+
+              {categoryOpen && (
+                <div className="absolute left-0 top-full mt-3 grid w-64 gap-1 rounded-2xl border border-zinc-800 bg-zinc-900 p-2 shadow-2xl">
+                  {CATEGORIES.map(([slug, label]) => (
+                    <button
+                      key={slug}
+                      type="button"
+                      onClick={() => handleCategoryClick(slug)}
+                      className="rounded-xl px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+          </nav>
 
-            {/* Search Form */}
-            <form onSubmit={handleSearchSubmit} className="ag-search-form">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  handleSearch(e.target.value);
-                }}
-                placeholder="Search products..."
-                className="ag-search-input"
-              />
-              <button type="submit" className="ag-search-btn">
-                <SearchIcon />
-              </button>
-            </form>
+          <form
+            onSubmit={handleSearchSubmit}
+            className="hidden min-w-0 flex-1 items-center overflow-hidden rounded-full border border-zinc-800 bg-zinc-900/80 lg:flex"
+          >
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => {
+                const value = event.target.value;
+                setSearchQuery(value);
+                debouncedSearch(value);
+              }}
+              placeholder="Search products..."
+              className="w-full bg-transparent px-4 py-2.5 text-sm text-white outline-none placeholder:text-zinc-500"
+            />
+            <button
+              type="submit"
+              className="border-l border-zinc-800 px-4 py-2.5 text-zinc-400 transition-colors hover:text-indigo-400"
+              aria-label="Search products"
+            >
+              <SearchIcon className="h-4 w-4" />
+            </button>
+          </form>
 
-            {/* User Menu */}
-            <div className="ag-user-wrapper" ref={userMenuRef}>
-              <button onClick={handleUserClick} className="ag-user-btn">
-                {isAuthenticated && fullUserProfile?.profile_image ? (
-                  <img src={fullUserProfile.profile_image} alt={displayName} className="ag-user-avatar" />
-                ) : isAuthenticated && user?.profile_image ? (
-                  <img src={user.profile_image} alt={displayName} className="ag-user-avatar" />
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setCartOpen(true)}
+              className="relative hidden items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white md:inline-flex"
+            >
+              <CartIcon className="h-4 w-4" />
+              Cart
+              {itemCount > 0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-500 px-1.5 text-[11px] font-bold text-white">
+                  {itemCount > 99 ? "99+" : itemCount}
+                </span>
+              )}
+            </button>
+
+            <div className="relative" ref={userMenuRef}>
+              <button
+                type="button"
+                onClick={handleUserClick}
+                className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-zinc-800 bg-zinc-900 transition-colors hover:bg-zinc-800"
+                aria-label={isAuthenticated ? "Open account menu" : "Login"}
+              >
+                {displayAvatar ? (
+                  <img src={displayAvatar} alt={displayName} className="h-full w-full object-cover" />
                 ) : (
-                  <UserIcon />
+                  <UserIcon className="h-5 w-5 text-zinc-400" />
                 )}
               </button>
 
               {userMenuOpen && isAuthenticated && (
-                <div className="ag-user-dropdown">
-                  <div className="ag-user-info">
-                    <div className="ag-user-name">{displayName}</div>
-                    <div className="ag-user-email">{displayEmail || displayName}</div>
-                    {displayPhone && (
-                      <div className="ag-user-phone text-xs text-gray-400 mt-1">{displayPhone}</div>
-                    )}
-                    {displayPoints !== undefined && (
-                      <div className="ag-user-points text-xs text-cyan-400 mt-1">
-                        ⭐ {displayPoints} points
-                      </div>
-                    )}
+                <div className="absolute right-0 mt-3 w-64 rounded-2xl border border-zinc-800 bg-zinc-900 p-2 shadow-2xl">
+                  <div className="rounded-xl px-3 py-3">
+                    <p className="truncate text-sm font-semibold text-white">{displayName}</p>
+                    <p className="truncate text-xs text-zinc-500">{displayEmail || `@${user?.user_id || "user"}`}</p>
+                    {displayPhone && <p className="mt-1 text-xs text-zinc-500">{displayPhone}</p>}
                   </div>
-                  <button onClick={handleOrders} className="ag-dropdown-item">
-                    <OrderIcon /> My Orders
+                  <div className="my-1 h-px bg-zinc-800" />
+                  <button
+                    type="button"
+                    onClick={handleOrders}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                  >
+                    <OrderIcon className="h-4 w-4" />
+                    My Orders
                   </button>
-                  <button onClick={handleProfile} className="ag-dropdown-item">
-                    <ProfileIcon /> My Account
+                  <button
+                    type="button"
+                    onClick={handleProfile}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                  >
+                    <ProfileIcon className="h-4 w-4" />
+                    My Account
                   </button>
-                  <button onClick={handleLogout} className="ag-dropdown-item danger">
-                    <LogoutIcon /> Sign Out
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-red-400 transition-colors hover:bg-red-500/10"
+                  >
+                    <LogoutIcon className="h-4 w-4" />
+                    Sign Out
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Cart Button */}
-            <button onClick={() => setCartOpen(true)} className="ag-cart-btn">
-              <CartIcon />
-              Cart
-              {itemCount > 0 && (
-                <span className="ag-cart-badge">
-                  {itemCount > 99 ? "99+" : itemCount}
-                </span>
-              )}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white md:hidden"
+              aria-label="Toggle mobile menu"
+            >
+              {mobileMenuOpen ? <CloseIcon className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
             </button>
-          </nav>
+          </div>
         </div>
-      </header>
 
-      <div className="ag-header-spacer"></div>
+        {mobileMenuOpen && (
+          <div ref={mobileMenuRef} className="border-t border-zinc-800 bg-zinc-950 md:hidden">
+            <div className="space-y-4 px-4 py-4">
+              <form
+                onSubmit={handleSearchSubmit}
+                className="flex items-center overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900"
+              >
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search products..."
+                  className="w-full bg-transparent px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-500"
+                />
+                <button
+                  type="submit"
+                  className="border-l border-zinc-800 px-4 py-3 text-zinc-400"
+                  aria-label="Search products"
+                >
+                  <SearchIcon className="h-4 w-4" />
+                </button>
+              </form>
+
+              <div className="grid gap-1">
+                <Link
+                  to="/"
+                  onClick={closeMenus}
+                  className={classNames(
+                    "rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                    location.pathname === "/" ? "bg-indigo-500/10 text-indigo-400" : "text-zinc-300 hover:bg-zinc-900"
+                  )}
+                >
+                  Home
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => setCategoryOpen((prev) => !prev)}
+                  className={classNames(
+                    "flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                    categoryOpen ? "bg-indigo-500/10 text-indigo-400" : "text-zinc-300 hover:bg-zinc-900"
+                  )}
+                >
+                  Categories
+                  <ChevronIcon className={classNames("h-4 w-4 transition-transform", categoryOpen && "rotate-180")} />
+                </button>
+
+                {categoryOpen && (
+                  <div className="grid gap-1 rounded-2xl border border-zinc-800 bg-zinc-900 p-2">
+                    {CATEGORIES.map(([slug, label]) => (
+                      <button
+                        key={slug}
+                        type="button"
+                        onClick={() => handleCategoryClick(slug)}
+                        className="rounded-xl px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCartOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-900"
+                >
+                  <span>Cart</span>
+                  {itemCount > 0 && (
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-500 px-1.5 text-[11px] font-bold text-white">
+                      {itemCount > 99 ? "99+" : itemCount}
+                    </span>
+                  )}
+                </button>
+
+                {isAuthenticated && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleOrders}
+                      className="rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-900"
+                    >
+                      My Orders
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleProfile}
+                      className="rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-900"
+                    >
+                      My Account
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10"
+                    >
+                      Sign Out
+                    </button>
+                  </>
+                )}
+
+                {!isAuthenticated && !isSearchPage && (
+                  <button
+                    type="button"
+                    onClick={handleUserClick}
+                    className="rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-500"
+                  >
+                    Login
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </header>
 
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
     </>
   );
 }
 
-// Icons (same as before)
-const HomeIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2h-5v-8H7v8H5a2 2 0 0 1-2-2z" />
-  </svg>
-);
+function IconWrapper({ children, className = "" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+}
 
-const GridIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="3" y="3" width="7" height="7" />
-    <rect x="14" y="3" width="7" height="7" />
-    <rect x="14" y="14" width="7" height="7" />
-    <rect x="3" y="14" width="7" height="7" />
-  </svg>
-);
+function SearchIcon({ className }) {
+  return (
+    <IconWrapper className={className}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.35-4.35" />
+    </IconWrapper>
+  );
+}
 
-const SearchIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-    <circle cx="11" cy="11" r="8" />
-    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-);
+function CartIcon({ className }) {
+  return (
+    <IconWrapper className={className}>
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+      <path d="M3 6h18" />
+      <path d="M16 10a4 4 0 0 1-8 0" />
+    </IconWrapper>
+  );
+}
 
-const CartIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <path d="M16 10a4 4 0 0 1-8 0" />
-  </svg>
-);
+function UserIcon({ className }) {
+  return (
+    <IconWrapper className={className}>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </IconWrapper>
+  );
+}
 
-const UserIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
+function OrderIcon({ className }) {
+  return (
+    <IconWrapper className={className}>
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+      <path d="M3 6h18" />
+      <path d="M16 10a4 4 0 0 1-8 0" />
+    </IconWrapper>
+  );
+}
 
-const OrderIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <path d="M16 10a4 4 0 0 1-8 0" />
-  </svg>
-);
+function ProfileIcon({ className }) {
+  return (
+    <IconWrapper className={className}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M5 20v-2a7 7 0 0 1 14 0v2" />
+    </IconWrapper>
+  );
+}
 
-const ProfileIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="8" r="4" />
-    <path d="M5 20v-2a7 7 0 0 1 14 0v2" />
-  </svg>
-);
+function LogoutIcon({ className }) {
+  return (
+    <IconWrapper className={className}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="m16 17 5-5-5-5" />
+      <path d="M21 12H9" />
+    </IconWrapper>
+  );
+}
 
-const LogoutIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <polyline points="16 17 21 12 16 7" />
-    <line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-);
+function MenuIcon({ className }) {
+  return (
+    <IconWrapper className={className}>
+      <path d="M4 12h16" />
+      <path d="M4 6h16" />
+      <path d="M4 18h16" />
+    </IconWrapper>
+  );
+}
+
+function CloseIcon({ className }) {
+  return (
+    <IconWrapper className={className}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </IconWrapper>
+  );
+}
+
+function ChevronIcon({ className }) {
+  return (
+    <IconWrapper className={className}>
+      <path d="m6 9 6 6 6-6" />
+    </IconWrapper>
+  );
+}
