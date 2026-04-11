@@ -190,7 +190,7 @@ export default function Header() {
               alt="AG TechScript"
               className="h-10 w-10 rounded-[10px] object-cover ring-1 ring-white/12 shadow-[0_8px_24px_rgba(0,0,0,0.28)]"
             />
-            <span className="hidden text-lg font-bold tracking-tight text-white sm:inline">
+            <span className="title text-lg font-bold tracking-tight text-white sm:inline">
               AG TechScript
             </span>
           </Link>
