@@ -6,9 +6,12 @@ import { useEffect } from "react";
  */
 export default function LoginPage() {
   useEffect(() => {
-    // Redirect to AG TechScript account portal
-    window.location.href = "https://account.agtechscript.in?redirect=" +
-      encodeURIComponent(window.location.origin);
+    const redirectTarget = sessionStorage.getItem("returnAfterLogin")
+      || window.location.origin;
+
+    window.location.href =
+      "https://account.agtechscript.in?redirect=" +
+      encodeURIComponent(redirectTarget);
   }, []);
 
   return (

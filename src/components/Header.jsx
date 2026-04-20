@@ -143,7 +143,8 @@ export default function Header() {
   function handleUserClick() {
     if (!isAuthenticated) {
       sessionStorage.setItem("returnAfterLogin", window.location.href);
-      window.location.href = "https://agtechscript.in#login";
+      window.location.href = "https://account.agtechscript.in?redirect=" +
+        encodeURIComponent(window.location.href);
       return;
     }
 
